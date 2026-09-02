@@ -6,7 +6,16 @@ export default function(component) {
   const toolbar = root.querySelector('[data-role="toolbar"]');
   const menu = root.querySelector('[data-role="context"]');
   const dialog = root.querySelector('[data-role="note-dialog"]');
+  const viewer = root.querySelector('[data-role="viewer-dialog"]');
+  const viewerCanvas = root.querySelector('[data-role="viewer-canvas"]');
+  const viewerImage = root.querySelector('[data-role="viewer-image"]');
   let contextSample = null;
+  let viewerScale = 1;
+  let viewerX = 0;
+  let viewerY = 0;
+  let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
 
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -48,9 +57,30 @@ export default function(component) {
     dialog.showModal();
   }
 
+  function updateViewer() {
+    viewerImage.style.transform = `translate(${viewerX}px, ${viewerY}px) scale(${viewerScale})`;
+    root.querySelector('[data-role="zoom-value"]').textContent = `${Math.round(viewerScale * 100)}%`;
+  }
+
+  function setViewerScale(nextScale) {
+    viewerScale = Math.max(0.25, Math.min(8, nextScale));
+    if (viewerScale === 1) { viewerX = 0; viewerY = 0; }
+    updateViewer();
+  }
+
+  function openViewer(sample) {
+    if (!sample || sample.kind !== 'image' || !sample.source) return;
+    contextSample = sample;
+    viewerScale = 1; viewerX = 0; viewerY = 0;
+    root.querySelector('[data-role="viewer-filename"]').textContent = sample.name;
+    viewerImage.src = sample.source;
+    updateViewer();
+    viewer.showModal();
+  }
+
   grid.replaceChildren();
-  grid.style.gridTemplateColumns = `repeat(${data.cols}, minmax(0, 1fr))`;
-  grid.style.gridAutoRows = `${Math.max(210, Math.min(420, 780 / Math.max(1, data.rows)))}px`;
+  grid.style.gridTemplateColumns = `repeat(${data.cols}, minmax(120px, 1fr))`;
+  grid.style.gridAutoRows = `${Math.max(130, Math.min(280, 500 / Math.max(1, data.rows)))}px`;
   empty.hidden = data.samples.length > 0;
   data.samples.forEach(sample => {
     const card = make('article', 'sample-card');
@@ -68,6 +98,12 @@ export default function(component) {
     card.appendChild(media);
     const filename = make('div', 'filename', sample.name); filename.title = sample.name; card.appendChild(filename);
     if (sample.notice) card.appendChild(make('div', 'notice', sample.notice));
+    if (sample.kind === 'image' && sample.source) {
+      const viewButton = make('button', 'view-button', '⛶');
+      viewButton.type = 'button'; viewButton.title = '单独查看并缩放';
+      viewButton.addEventListener('click', event => { event.stopPropagation(); openViewer(sample); });
+      card.appendChild(viewButton);
+    }
     if (sample.has_note) { const icon = make('span', 'note-indicator', '📝'); icon.title = '已有单样本备注'; card.appendChild(icon); }
     renderBadges(card, sample);
     card.addEventListener('click', event => {
@@ -82,6 +118,7 @@ export default function(component) {
     });
     card.addEventListener('contextmenu', event => {
       event.preventDefault(); contextSample = sample;
+      root.querySelector('[data-role="open-viewer"]').hidden = sample.kind !== 'image' || !sample.source;
       menu.hidden = false;
       menu.style.left = `${Math.min(event.clientX, window.innerWidth - 190)}px`;
       menu.style.top = `${Math.min(event.clientY, window.innerHeight - 70)}px`;
@@ -95,12 +132,17 @@ export default function(component) {
   toolbar.appendChild(activeStatus);
   const numberInput = (labelText, value, min, max, callback) => {
     const label = make('label', '', labelText);
-    const input = make('input'); input.type = 'number'; input.min = min; input.max = max; input.value = value;
-    input.addEventListener('change', () => callback(Math.max(min, Math.min(max, Number(input.value) || min))));
+    const input = make('input'); input.type = 'number'; input.min = min; input.value = value;
+    if (max !== null) input.max = max;
+    input.addEventListener('change', () => {
+      let nextValue = Math.max(min, Math.floor(Number(input.value) || min));
+      if (max !== null) nextValue = Math.min(max, nextValue);
+      callback(nextValue);
+    });
     label.appendChild(input); toolbar.appendChild(label);
   };
-  numberInput('行', data.rows, 1, 8, value => setStateValue('rows', value));
-  numberInput('列', data.cols, 1, 8, value => setStateValue('cols', value));
+  numberInput('行', data.rows, 1, null, value => setStateValue('rows', value));
+  numberInput('列', data.cols, 1, null, value => setStateValue('cols', value));
   const previous = make('button', '', '← 上一页'); previous.disabled = data.page <= 1;
   previous.onclick = () => setStateValue('page', data.page - 1); toolbar.appendChild(previous);
   numberInput('页码', data.page, 1, Math.max(1, data.total_pages), value => setStateValue('page', value));
@@ -110,8 +152,32 @@ export default function(component) {
   const badgeLabel = make('label', '', '显示角标');
   const checkbox = make('input'); checkbox.type = 'checkbox'; checkbox.checked = data.show_badges;
   checkbox.onchange = () => setStateValue('show_badges', checkbox.checked); badgeLabel.prepend(checkbox); toolbar.appendChild(badgeLabel);
+  const refresh = make('button', 'refresh-button', '↻ 刷新');
+  refresh.title = '重新扫描输入目录；刷新后保持当前页';
+  refresh.onclick = () => {
+    refresh.disabled = true;
+    setTriggerValue('action', {type: 'refresh', op_id: opId()});
+  };
+  toolbar.appendChild(refresh);
 
+  root.querySelector('[data-role="open-viewer"]').onclick = () => { menu.hidden = true; if (contextSample) openViewer(contextSample); };
   root.querySelector('[data-role="open-note"]').onclick = () => { menu.hidden = true; if (contextSample) openNote(contextSample); };
+  root.querySelector('[data-role="close-viewer"]').onclick = () => viewer.close();
+  root.querySelector('[data-role="zoom-in"]').onclick = () => setViewerScale(viewerScale * 1.25);
+  root.querySelector('[data-role="zoom-out"]').onclick = () => setViewerScale(viewerScale / 1.25);
+  root.querySelector('[data-role="zoom-reset"]').onclick = () => { viewerScale = 1; viewerX = 0; viewerY = 0; updateViewer(); };
+  viewerCanvas.onwheel = event => { event.preventDefault(); setViewerScale(viewerScale * (event.deltaY < 0 ? 1.12 : 0.89)); };
+  viewerCanvas.onpointerdown = event => {
+    dragging = true; dragStartX = event.clientX - viewerX; dragStartY = event.clientY - viewerY;
+    viewerCanvas.classList.add('dragging'); viewerCanvas.setPointerCapture(event.pointerId);
+  };
+  viewerCanvas.onpointermove = event => {
+    if (!dragging) return;
+    viewerX = event.clientX - dragStartX; viewerY = event.clientY - dragStartY; updateViewer();
+  };
+  viewerCanvas.onpointerup = event => {
+    dragging = false; viewerCanvas.classList.remove('dragging'); viewerCanvas.releasePointerCapture(event.pointerId);
+  };
   root.querySelector('[data-role="save-note"]').onclick = () => {
     if (!contextSample) return;
     const text = root.querySelector('[data-role="note-text"]').value;
@@ -123,7 +189,7 @@ export default function(component) {
   };
   const dismissMenu = event => { if (!menu.contains(event.target)) menu.hidden = true; };
   const keyboard = event => {
-    if (dialog.open || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (dialog.open || viewer.open || event.ctrlKey || event.metaKey || event.altKey) return;
     const tag = event.target.tagName;
     if (['INPUT', 'TEXTAREA', 'SELECT', 'VIDEO'].includes(tag) || event.target.isContentEditable) return;
     if ((event.key === 'a' || event.key === 'A') && data.page > 1) setStateValue('page', data.page - 1);

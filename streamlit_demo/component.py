@@ -21,7 +21,6 @@ sample_grid_component = st.components.v2.component(
 
 
 def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
-    height = min(1600, max(420, rows * 260 + 94))
     return sample_grid_component(
         data=data,
         default={"rows": rows, "cols": data["cols"], "page": data["page"], "show_badges": True},
@@ -31,5 +30,5 @@ def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
         on_show_badges_change=lambda: None,
         on_action_change=lambda: None,
         key=key,
-        height=height,
+        height=620,
     )

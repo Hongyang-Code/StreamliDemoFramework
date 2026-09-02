@@ -37,7 +37,29 @@ def state_value(state, key: str, default):
     return default if value is None else value
 
 
-def handle_component_action(state, store: LabelStore) -> None:
+def render_create_label_form(store: LabelStore) -> None:
+    with st.container(border=True):
+        st.caption("新建标签")
+        with st.form("create_label_form", clear_on_submit=True):
+            new_name = st.text_input("标签名称")
+            new_color = st.color_picker("标签颜色", stable_color(new_name or "新标签"))
+            cancel_col, create_col = st.columns(2)
+            cancel = cancel_col.form_submit_button("取消", use_container_width=True)
+            create = create_col.form_submit_button("创建", type="primary", use_container_width=True)
+    if cancel:
+        st.session_state["show_create_label_form"] = False
+        st.rerun()
+    if create:
+        try:
+            store.create_label(new_name, new_color)
+            st.session_state["pending_active_label"] = new_name.strip()
+            st.session_state["show_create_label_form"] = False
+            st.rerun()
+        except StorageError as exc:
+            st.error(str(exc))
+
+
+def handle_component_action(state, store: LabelStore, dataset: DatasetIndex) -> None:
     action = state_value(state, "action", None)
     if not action:
         return
@@ -49,7 +71,10 @@ def handle_component_action(state, store: LabelStore) -> None:
     processed.append(op_id)
     del processed[:-200]
     try:
-        if action.get("type") == "membership":
+        if action.get("type") == "refresh":
+            dataset.refresh()
+            st.toast("文件列表已刷新，当前页保持不变", icon="🔄")
+        elif action.get("type") == "membership":
             store.set_membership(
                 str(action.get("label", "")),
                 str(action.get("sample", "")),
@@ -63,7 +88,6 @@ def handle_component_action(state, store: LabelStore) -> None:
             raise StorageError("未知的页面操作")
     except StorageError as exc:
         st.session_state["operation_error"] = str(exc)
-    st.rerun()
 
 
 def render_sidebar(store: LabelStore) -> dict[str, str] | None:
@@ -71,34 +95,24 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
         st.header("标签管理")
         labels = store.list_labels()
         names = list(labels)
+        choices = ["（不选择标签）", *names]
         if "pending_active_label" in st.session_state:
             pending = st.session_state.pop("pending_active_label")
-            st.session_state["active_label"] = pending if pending in labels else None
             st.session_state["label_radio"] = pending if pending in labels else "（不选择标签）"
-        current = st.session_state.get("active_label")
-        if current not in labels:
-            current = None
-            st.session_state["active_label"] = None
-            if st.session_state.get("label_radio") not in (None, "（不选择标签）"):
-                st.session_state["label_radio"] = "（不选择标签）"
-
-        choices = ["（不选择标签）", *names]
-        current_index = names.index(current) + 1 if current in names else 0
-        selected = st.radio("当前标签", choices, index=current_index, key="label_radio")
+        if st.session_state.get("label_radio") not in choices:
+            st.session_state["label_radio"] = "（不选择标签）"
+        selected = st.radio(
+            "当前标签",
+            choices,
+            index=choices.index(st.session_state.get("label_radio", choices[0])),
+            key="label_radio",
+        )
         st.session_state["active_label"] = None if selected == choices[0] else selected
 
-        with st.expander("新建标签", expanded=not labels):
-            with st.form("create_label_form", clear_on_submit=True):
-                new_name = st.text_input("标签名称")
-                new_color = st.color_picker("标签颜色", stable_color(new_name or "新标签"))
-                if st.form_submit_button("创建", type="primary", use_container_width=True):
-                    try:
-                        store.create_label(new_name, new_color)
-                        st.session_state["active_label"] = new_name.strip()
-                        st.session_state["pending_active_label"] = new_name.strip()
-                        st.rerun()
-                    except StorageError as exc:
-                        st.error(str(exc))
+        if st.button("＋ 新建标签", use_container_width=True):
+            st.session_state["show_create_label_form"] = True
+        if st.session_state.get("show_create_label_form", False):
+            render_create_label_form(store)
 
         active = st.session_state.get("active_label")
         if active and active in labels:
@@ -111,20 +125,23 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
                     st.rerun()
                 except StorageError as exc:
                     st.error(str(exc))
-            rename_value = st.text_input("新名称", value=active, key=f"rename_{active}")
-            if st.button("重命名", use_container_width=True, disabled=rename_value.strip() == active):
-                try:
-                    store.rename_label(active, rename_value)
-                    st.session_state["active_label"] = rename_value.strip()
-                    st.session_state["pending_active_label"] = rename_value.strip()
-                    st.rerun()
-                except StorageError as exc:
-                    st.error(str(exc))
+            with st.form(f"rename_form_{active}"):
+                rename_value = st.text_input("新名称", value=active)
+                rename = st.form_submit_button("重命名", use_container_width=True)
+            if rename:
+                if rename_value.strip() == active:
+                    st.info("请输入一个不同的新名称")
+                else:
+                    try:
+                        store.rename_label(active, rename_value)
+                        st.session_state["pending_active_label"] = rename_value.strip()
+                        st.rerun()
+                    except StorageError as exc:
+                        st.error(str(exc))
             confirm_delete = st.checkbox("确认删除此标签", key=f"delete_confirm_{active}")
             if st.button("删除标签", type="secondary", use_container_width=True, disabled=not confirm_delete):
                 try:
                     store.delete_label(active)
-                    st.session_state["active_label"] = None
                     st.session_state["pending_active_label"] = None
                     st.rerun()
                 except StorageError as exc:
@@ -147,7 +164,18 @@ def main(config: AppConfig) -> None:
         <style>
         .block-container { max-width: 100%; padding-top: 1.2rem; padding-bottom: 1rem; }
         [data-testid="stSidebar"] { border-right: 1px solid rgba(148,163,184,.25); }
-        [data-testid="stMetric"] { background: rgba(148,163,184,.08); border-radius: 12px; padding: 10px 14px; }
+        .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 0 0 12px auto;
+          border: 1px solid rgba(148,163,184,.35); border-radius: 999px; background: rgba(255,255,255,.92);
+          box-shadow: 0 6px 22px rgba(15,23,42,.08); backdrop-filter: blur(10px); cursor: default; }
+        .status-summary { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 15px; font-size: 13px; font-weight: 650; }
+        .status-summary i { width: 7px; height: 7px; border-radius: 50%; background: #2563EB; box-shadow: 0 0 0 4px rgba(37,99,235,.11); }
+        .status-detail { position: absolute; right: 0; top: 43px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+          width: 300px; padding: 12px; border: 1px solid rgba(148,163,184,.3); border-radius: 14px; background: white;
+          box-shadow: 0 16px 40px rgba(15,23,42,.16); opacity: 0; visibility: hidden; transform: translateY(-6px); transition: .16s ease; }
+        .status-float:hover .status-detail, .status-float:focus-within .status-detail { opacity: 1; visibility: visible; transform: translateY(0); }
+        .status-detail div { padding: 9px 10px; border-radius: 10px; background: #F1F5F9; }
+        .status-detail small { display: block; color: #64748B; margin-bottom: 3px; }
+        .status-detail strong { font-size: 18px; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -158,29 +186,28 @@ def main(config: AppConfig) -> None:
         dataset.refresh()
     store = LabelStore(config.label_dir, dataset.names)
     component_state = st.session_state.get("sample_grid")
-    handle_component_action(component_state, store)
+    handle_component_action(component_state, store, dataset)
 
     active_label = render_sidebar(store)
     operation_error = st.session_state.pop("operation_error", None)
     if operation_error:
         st.error(f"上一次操作失败：{operation_error}")
 
-    title_col, refresh_col = st.columns([8, 1])
-    with title_col:
-        st.title("实验结果展示与标注")
-        st.caption(str(config.data_dir))
-    with refresh_col:
-        st.write("")
-        st.write("")
-        if st.button("刷新文件", use_container_width=True):
-            dataset.refresh()
-            st.rerun()
+    st.title("实验结果展示与标注")
+    st.caption(str(config.data_dir))
 
-    info_a, info_b, info_c, info_d = st.columns(4)
-    info_a.metric("当前模态", MODE_LABELS[config.mode])
-    info_b.metric("样本数量", f"{len(dataset.entries):,}")
-    info_c.metric("单样本上限", f"{config.preview_limit_mb:g} MB")
-    info_d.metric("单页上限", f"{config.page_payload_limit_mb:g} MB")
+    st.markdown(
+        f"""
+        <div class="status-float" tabindex="0" aria-label="数据概况">
+          <div class="status-summary"><i></i><span>{MODE_LABELS[config.mode]}模式</span><span>·</span><span>{len(dataset.entries):,} 个样本</span></div>
+          <div class="status-detail">
+            <div><small>当前模态</small><strong>{MODE_LABELS[config.mode]}</strong></div>
+            <div><small>样本数量</small><strong>{len(dataset.entries):,}</strong></div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if config.mode == "video":
         ok, message = PreviewManager.check_video_tools()
@@ -188,8 +215,8 @@ def main(config: AppConfig) -> None:
             st.error(message)
 
     default_rows, default_cols = DEFAULT_LAYOUTS[config.mode]
-    rows = max(1, min(8, int(state_value(component_state, "rows", default_rows))))
-    cols = max(1, min(8, int(state_value(component_state, "cols", default_cols))))
+    rows = max(1, int(state_value(component_state, "rows", default_rows)))
+    cols = max(1, int(state_value(component_state, "cols", default_cols)))
     per_page = rows * cols
     total_pages = math.ceil(len(dataset.entries) / per_page) if dataset.entries else 0
     requested_page = int(state_value(component_state, "page", 1))

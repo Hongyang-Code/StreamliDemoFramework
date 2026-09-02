@@ -76,14 +76,39 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             page.goto(url, wait_until="networkidle")
             expect(page.get_by_text("实验结果展示与标注", exact=True).first).to_be_visible(timeout=30_000)
             cards = page.locator(".sample-card")
-            expect(cards).to_have_count(3, timeout=30_000)
+            expect(cards).to_have_count(6, timeout=30_000)
+            expect(page.get_by_text("图片模式", exact=True)).to_be_visible()
+            expect(page.get_by_text("30 个样本", exact=True)).to_be_visible()
+            expect(page.get_by_text("单样本上限", exact=True)).to_have_count(0)
 
-            page.get_by_label("标签名称").fill("待复核")
+            page.get_by_role("button", name="＋ 新建标签", exact=True).click()
+            page.get_by_label("标签名称").fill("样例标签一")
             page.get_by_role("button", name="创建", exact=True).click()
-            expect(page.get_by_text("编辑标签：待复核", exact=True)).to_be_visible(timeout=30_000)
-            expect(page.locator(".active-label")).to_have_text("当前标签：待复核", timeout=30_000)
+            expect(page.get_by_text("编辑标签：样例标签一", exact=True)).to_be_visible(timeout=30_000)
+
+            page.get_by_role("button", name="＋ 新建标签", exact=True).click()
+            page.get_by_label("标签名称").fill("样例标签二")
+            page.get_by_role("button", name="创建", exact=True).click()
+            expect(page.get_by_text("编辑标签：样例标签二", exact=True)).to_be_visible(timeout=30_000)
+            page.get_by_text("样例标签一", exact=True).click()
+            expect(page.locator(".active-label")).to_have_text("当前标签：样例标签一", timeout=10_000)
+            page.get_by_text("样例标签二", exact=True).click()
+            expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二", timeout=10_000)
+
+            page.get_by_label("新名称").fill("样例标签二已修改")
+            page.get_by_role("button", name="重命名", exact=True).click()
+            expect(page.get_by_text("编辑标签：样例标签二已修改", exact=True)).to_be_visible(timeout=10_000)
+            expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二已修改", timeout=10_000)
 
             first = page.locator(".sample-card").first
+            first.hover()
+            first.locator(".view-button").click()
+            viewer = page.locator(".viewer-dialog")
+            expect(viewer).to_be_visible()
+            viewer.get_by_role("button", name="放大").click()
+            expect(viewer.locator('[data-role="zoom-value"]')).to_have_text("125%")
+            viewer.get_by_role("button", name="关闭").click()
+
             optimistic = first.evaluate(
                 """card => {
                     const started = performance.now();
@@ -93,7 +118,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             )
             assert optimistic["badges"] == 1
             assert optimistic["elapsed"] < 100
-            label_path = data_dir / "label" / "待复核.txt"
+            label_path = data_dir / "label" / "样例标签二已修改.txt"
             save_deadline = time.monotonic() + 10
             while time.monotonic() < save_deadline:
                 if label_path.exists() and len(label_path.read_text(encoding="utf-8").splitlines()) > 1:
@@ -101,7 +126,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
                 time.sleep(0.05)
             else:
                 raise AssertionError("optimistic badge appeared but the label was not persisted")
-            expect(page.locator(".active-label")).to_have_text("当前标签：待复核", timeout=10_000)
+            expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二已修改", timeout=10_000)
 
             page.locator(".sample-card").first.click(button="right")
             page.get_by_role("button", name="📝 单个样本备注").click()
@@ -120,14 +145,32 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             badge_toggle.uncheck()
             expect(page.locator(".sample-card").first.locator(".badge")).to_have_count(0)
 
+            rows = page.locator(".toolbar label", has_text="行").locator("input")
+            rows.fill("12")
+            rows.press("Tab")
+            expect(rows).to_have_value("12", timeout=10_000)
+            expect(page.locator(".sample-card")).to_have_count(30)
+            rows.fill("2")
+            rows.press("Tab")
+            expect(page.locator(".toolbar label", has_text="行").locator("input")).to_have_value("2", timeout=10_000)
+            expect(page.locator(".sample-card")).to_have_count(6, timeout=10_000)
+
             cols = page.locator(".toolbar label", has_text="列").locator("input")
             cols.fill("1")
             cols.press("Tab")
-            expect(page.locator(".toolbar")).to_contain_text("/ 2 页", timeout=10_000)
+            expect(page.locator(".toolbar")).to_contain_text("/ 15 页", timeout=10_000)
             page.locator("body").press("d")
             page_input = page.locator(".toolbar label", has_text="页码").locator("input")
             expect(page_input).to_have_value("2", timeout=10_000)
-            expect(page.locator(".sample-card")).to_have_count(1)
+            expect(page.locator(".sample-card")).to_have_count(2)
+            page.get_by_role("button", name="↻ 刷新", exact=True).click()
+            expect(page_input).to_have_value("2", timeout=10_000)
+            expect(page.locator(".sample-card")).to_have_count(2)
+
+            page.get_by_text("确认删除此标签", exact=True).click()
+            expect(page.get_by_role("button", name="删除标签", exact=True)).to_be_enabled(timeout=10_000)
+            page.get_by_role("button", name="删除标签", exact=True).click()
+            expect(page.get_by_label("样例标签二已修改", exact=True)).to_have_count(0)
             browser.close()
     finally:
         process.terminate()

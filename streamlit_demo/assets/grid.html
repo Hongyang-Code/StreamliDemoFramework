@@ -3,8 +3,26 @@
   <div class="empty-state" data-role="empty" hidden>当前目录没有匹配此模态的文件。</div>
   <div class="toolbar" data-role="toolbar"></div>
   <div class="context-menu" data-role="context" hidden>
+    <button type="button" data-role="open-viewer">🔍 单独查看</button>
     <button type="button" data-role="open-note">📝 单个样本备注</button>
   </div>
+  <dialog class="viewer-dialog" data-role="viewer-dialog">
+    <div class="viewer-shell">
+      <header>
+        <strong data-role="viewer-filename"></strong>
+        <button type="button" data-role="close-viewer" class="icon-button" aria-label="关闭">×</button>
+      </header>
+      <div class="viewer-canvas" data-role="viewer-canvas">
+        <img data-role="viewer-image" alt="单独查看图片">
+      </div>
+      <footer>
+        <button type="button" data-role="zoom-out" title="缩小" aria-label="缩小">−</button>
+        <button type="button" data-role="zoom-reset">复位 · <span data-role="zoom-value">100%</span></button>
+        <button type="button" data-role="zoom-in" title="放大" aria-label="放大">＋</button>
+        <small>滚轮缩放 · 拖拽平移</small>
+      </footer>
+    </div>
+  </dialog>
   <dialog class="note-dialog" data-role="note-dialog">
     <form method="dialog">
       <header>
