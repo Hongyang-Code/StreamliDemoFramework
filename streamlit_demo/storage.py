@@ -278,6 +278,35 @@ class LabelStore:
             self._write_label(path, color, samples)
         self.refresh_index(force=True)
 
+    def set_memberships(self, operations: Iterable[dict]) -> None:
+        normalized: list[tuple[str, str, bool]] = []
+        for operation in operations:
+            if not isinstance(operation, dict):
+                raise StorageError("批量标签操作格式错误")
+            label_name = validate_label_name(str(operation.get("label", "")))
+            sample = str(operation.get("sample", ""))
+            if sample not in self.valid_samples:
+                raise StorageError("样本不在当前一级目录索引中")
+            normalized.append((label_name, sample, bool(operation.get("assigned"))))
+        if not normalized:
+            return
+        with self._lock():
+            grouped: dict[str, list[tuple[str, bool]]] = {}
+            for label_name, sample, assigned in normalized:
+                grouped.setdefault(label_name, []).append((sample, assigned))
+            for label_name, changes in grouped.items():
+                path = self.label_dir / f"{label_name}.txt"
+                if not path.exists():
+                    raise StorageError("标签不存在")
+                color, samples = self._read_label(path, repair=False)
+                for sample, assigned in changes:
+                    if assigned:
+                        samples.add(sample)
+                    else:
+                        samples.discard(sample)
+                self._write_label(path, color, samples)
+        self.refresh_index(force=True)
+
     def _empty_notes(self) -> dict:
         return {"version": 1, "samples": {}}
 

@@ -23,12 +23,13 @@ sample_grid_component = st.components.v2.component(
 def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
     return sample_grid_component(
         data=data,
-        default={"rows": rows, "cols": data["cols"], "page": data["page"], "show_badges": True},
+        default={"rows": rows, "cols": data["cols"], "page": data["page"], "show_badges": True, "marker_style": "badge"},
         on_rows_change=lambda: None,
         on_cols_change=lambda: None,
         on_page_change=lambda: None,
         on_show_badges_change=lambda: None,
+        on_marker_style_change=lambda: None,
         on_action_change=lambda: None,
         key=key,
-        height=620,
+        height=720,
     )

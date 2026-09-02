@@ -87,3 +87,17 @@ def test_concurrent_writes_to_different_samples_are_preserved(tmp_path: Path):
     with ThreadPoolExecutor(max_workers=3) as executor:
         list(executor.map(lambda name: store.set_membership("tag", name, True), ["a.jpg", "b.jpg", "c.jpg"]))
     assert set((tmp_path / "label" / "tag.txt").read_text().splitlines()[1:]) == {"a.jpg", "b.jpg", "c.jpg"}
+
+
+def test_batched_memberships_keep_latest_target_state(tmp_path: Path):
+    store = make_store(tmp_path)
+    store.create_label("tag", "#334455")
+    store.set_memberships(
+        [
+            {"label": "tag", "sample": "a.jpg", "assigned": True},
+            {"label": "tag", "sample": "b.jpg", "assigned": True},
+            {"label": "tag", "sample": "a.jpg", "assigned": False},
+            {"label": "tag", "sample": "c.jpg", "assigned": True},
+        ]
+    )
+    assert (tmp_path / "label" / "tag.txt").read_text().splitlines() == ["#334455", "b.jpg", "c.jpg"]

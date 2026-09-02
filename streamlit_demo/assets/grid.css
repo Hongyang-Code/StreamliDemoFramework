@@ -24,6 +24,7 @@
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
 .active-label { font-size: 12px; font-weight: 700; }
 .toolbar input[type=number] { width: 58px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.toolbar select { padding: 5px 24px 5px 8px; border: 1px solid #cbd5e1; border-radius: 7px; background: var(--st-background-color); color: var(--st-text-color); }
 button { border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 11px; background: var(--st-background-color); color: var(--st-text-color); cursor: pointer; }
 button:disabled { opacity: .42; cursor: not-allowed; }
 button.primary { color: white; border-color: var(--st-primary-color); background: var(--st-primary-color); }
