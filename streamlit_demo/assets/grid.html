@@ -1,0 +1,25 @@
+<div class="sample-app">
+  <div class="sample-grid" data-role="grid"></div>
+  <div class="empty-state" data-role="empty" hidden>当前目录没有匹配此模态的文件。</div>
+  <div class="toolbar" data-role="toolbar"></div>
+  <div class="context-menu" data-role="context" hidden>
+    <button type="button" data-role="open-note">📝 单个样本备注</button>
+  </div>
+  <dialog class="note-dialog" data-role="note-dialog">
+    <form method="dialog">
+      <header>
+        <div><strong>单个样本备注</strong><small data-role="note-filename"></small></div>
+        <button value="cancel" class="icon-button" aria-label="关闭">×</button>
+      </header>
+      <textarea data-role="note-text" placeholder="输入这个样本的备注……"></textarea>
+      <div class="note-meta" data-role="note-updated"></div>
+      <details><summary>修订历史</summary><div data-role="note-history" class="history"></div></details>
+      <footer>
+        <button type="button" data-role="clear-note" class="danger">清空备注</button>
+        <span></span>
+        <button value="cancel">取消</button>
+        <button type="button" data-role="save-note" class="primary">保存</button>
+      </footer>
+    </form>
+  </dialog>
+</div>

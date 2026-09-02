@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest==8.4.2
+pytest-cov==6.2.1
+# 1.39 retains browser binaries for the Ubuntu 18.04 servers used by this project.
+playwright==1.39.0

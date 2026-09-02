@@ -1,0 +1,4 @@
+experiment,accuracy,recall,f1
+baseline,0.912,0.886,0.899
+method_a,0.941,0.923,0.932
+method_b,0.936,0.929,0.932

@@ -1,0 +1,4 @@
+2026-09-02 08:00:00 INFO epoch=1 loss=0.824 val_acc=0.742
+2026-09-02 08:02:14 INFO epoch=2 loss=0.603 val_acc=0.819
+2026-09-02 08:04:31 INFO epoch=3 loss=0.471 val_acc=0.867
+2026-09-02 08:06:52 INFO training completed checkpoint=best.pt

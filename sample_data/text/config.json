@@ -1,0 +1,6 @@
+{
+  "model": "multimodal-demo",
+  "dataset": "reference-data",
+  "modalities": ["image", "video", "text"],
+  "status": "ready"
+}

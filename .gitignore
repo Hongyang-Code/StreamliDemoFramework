@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.playwright/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# 每台服务器的私有启动配置
+demo_scripts/*
+!demo_scripts/.gitkeep
+
+# 运行时数据与缓存
+**/label/
+*.working.mp4
