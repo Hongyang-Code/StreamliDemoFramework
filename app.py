@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import hashlib
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, 
 
 
 MODE_LABELS = {"image": "图片", "video": "视频", "text": "文本"}
-DEFAULT_LAYOUTS = {"image": (2, 3), "video": (1, 2), "text": (2, 2)}
+DEFAULT_COLUMNS = {"image": 3, "video": 2, "text": 2}
 
 
 @st.cache_resource(show_spinner=False)
@@ -74,7 +73,7 @@ def handle_component_action(state, store: LabelStore, dataset: DatasetIndex) -> 
     try:
         if action.get("type") == "refresh":
             dataset.refresh()
-            st.toast("文件列表已刷新，当前页保持不变", icon="🔄")
+            st.toast("文件列表已刷新", icon="🔄")
         elif action.get("type") == "membership":
             store.set_membership(
                 str(action.get("label", "")),
@@ -252,18 +251,14 @@ def main(config: AppConfig) -> None:
         if not ok:
             st.error(message)
 
-    default_rows, default_cols = DEFAULT_LAYOUTS[config.mode]
-    rows = max(1, int(state_value(component_state, "rows", default_rows)))
+    default_cols = DEFAULT_COLUMNS[config.mode]
     cols = max(1, int(state_value(component_state, "cols", default_cols)))
-    per_page = rows * cols
-    total_pages = math.ceil(len(dataset.entries) / per_page) if dataset.entries else 0
-    requested_page = int(state_value(component_state, "page", 1))
-    page = 1 if total_pages == 0 else max(1, min(total_pages, requested_page))
     show_badges = bool(state_value(component_state, "show_badges", True))
-    entries = dataset.page(page, per_page)
+    entries = dataset.entries
+    rows = max(1, (len(entries) + cols - 1) // cols)
 
     manager = get_preview_manager(str(config.data_dir), config.preview_cache_mb)
-    with st.spinner("正在准备当前页预览……", show_time=True):
+    with st.spinner("正在准备全部样本预览……", show_time=True):
         previews = manager.prepare_page(
             entries,
             config.mode,
@@ -303,8 +298,6 @@ def main(config: AppConfig) -> None:
             "samples": samples,
             "rows": rows,
             "cols": cols,
-            "page": page,
-            "total_pages": total_pages,
             "total_count": len(dataset.entries),
             "show_badges": show_badges,
             "active_label": active_label,

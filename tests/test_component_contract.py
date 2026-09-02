@@ -9,8 +9,6 @@ def test_component_contains_required_interactions():
     for contract in (
         "contextmenu",
         "setTriggerValue('action'",
-        "setStateValue('page'",
-        "setStateValue('rows'",
         "setStateValue('cols'",
         "show_badges",
         "assigned",
@@ -29,9 +27,16 @@ def test_component_uses_safe_text_rendering():
     assert ".innerHTML" not in javascript
 
 
-def test_row_and_column_inputs_have_no_maximum():
+def test_column_input_has_no_maximum():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
     app = (ASSETS.parents[1] / "app.py").read_text(encoding="utf-8")
-    assert "data.rows, 1, null" in javascript
     assert "data.cols, 1, null" in javascript
     assert "min(8" not in app
+
+
+def test_component_has_no_pagination_controls():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    assert "上一页" not in javascript
+    assert "下一页" not in javascript
+    assert "页码" not in javascript
+    assert "setStateValue('page'" not in javascript

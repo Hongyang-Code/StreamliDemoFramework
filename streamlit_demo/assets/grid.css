@@ -1,6 +1,6 @@
 :host { color: var(--st-text-color); font-family: var(--st-font); }
 * { box-sizing: border-box; }
-.sample-app { position: relative; height: 100%; min-height: 0; padding: 2px; display: flex; flex-direction: column; overflow: hidden; }
+.sample-app { position: relative; height: 100%; min-height: 0; padding: 2px; display: flex; flex-direction: column; overflow: visible; }
 .sample-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; align-items: stretch; align-content: start; overflow: auto; padding: 2px 3px 8px; }
 .sample-card {
   position: relative; min-width: 0; overflow: hidden; border: 1px solid color-mix(in srgb, var(--st-text-color) 14%, transparent);
@@ -21,7 +21,7 @@
 .badge-more { font-size: 10px; font-weight: 700; color: #334155; }
 .frame-rings { position:absolute; inset:0; z-index:5; border-radius:13px; pointer-events:none; }
 .note-indicator { position: absolute; left: 8px; bottom: 39px; padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,.9); font-size: 12px; }
-.toolbar { flex: 0 0 auto; z-index: 10; margin-top: 8px; min-height: 50px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; background: color-mix(in srgb, var(--st-background-color) 96%, transparent); box-shadow: 0 -3px 18px rgba(15,23,42,.08); backdrop-filter: blur(10px); }
+.toolbar { position: absolute; left: 2px; flex: 0 0 auto; z-index: 100; margin-top: 8px; min-height: 50px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; background: color-mix(in srgb, var(--st-background-color) 96%, transparent); box-shadow: 0 -3px 18px rgba(15,23,42,.08); backdrop-filter: blur(10px); }
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
 .active-label { font-size: 12px; font-weight: 700; }
 .toolbar input[type=number] { width: 58px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 7px; }
