@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import hashlib
 import sys
 from pathlib import Path
 
@@ -98,7 +99,7 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
     with st.sidebar:
         st.header("标签管理")
         labels = store.list_labels()
-        names = list(labels)
+        label_styles = store.get_label_styles()
         if "pending_active_label" in st.session_state:
             pending = st.session_state.pop("pending_active_label")
             st.session_state["active_label"] = pending if pending in labels else None
@@ -121,65 +122,84 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
             render_create_label_form(store)
 
         for name, color in labels.items():
-            title = f"{'✓  ' if name == active else ''}{name}"
-            with st.expander(title):
-                st.markdown(
-                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-                    f'<span style="width:12px;height:12px;border-radius:50%;background:{color};display:inline-block"></span>'
-                    f'<span>{"当前正在使用" if name == active else "标签设置"}</span></div>',
-                    unsafe_allow_html=True,
-                )
-                select_text = "取消选择" if name == active else "设为当前标签"
-                if st.button(select_text, key=f"select_{name}", use_container_width=True):
-                    st.session_state["active_label"] = None if name == active else name
+            token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
+            selected_css = f"border-color:{color}!important;box-shadow:0 0 0 1px {color}33!important;" if name == active else ""
+            st.markdown(
+                f"""
+                <style>
+                .st-key-label_card_{token} {{ padding:.18rem .28rem!important; margin-bottom:.35rem; {selected_css} }}
+                .st-key-label_card_{token} [data-testid="stVerticalBlock"] {{ gap:.25rem; }}
+                .st-key-select_{token} button {{ border:0!important; background:transparent!important; padding:.22rem .25rem!important; min-height:30px; text-align:left; }}
+                .st-key-select_{token} button p {{ color:{color}!important; font-weight:750!important; }}
+                .st-key-edit_{token} button, .st-key-delete_{token} button {{ padding:.22rem .32rem!important; min-height:30px; font-size:.72rem; }}
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+            with st.container(border=True, key=f"label_card_{token}"):
+                name_col, edit_col, delete_col = st.columns([4.2, 2, 2], gap="small", vertical_alignment="center")
+                if name_col.button(
+                    f"{'✓  ' if name == active else ''}{name}",
+                    key=f"select_{token}",
+                    use_container_width=True,
+                ):
+                    st.session_state["active_label"] = name
                     st.rerun()
-
-                selected_color = st.color_picker("颜色", color, key=f"color_{name}")
-                if st.button("保存颜色", key=f"save_color_{name}", use_container_width=True):
+                if edit_col.button("编辑", key=f"edit_{token}", use_container_width=True):
+                    st.session_state["editing_label"] = None if st.session_state.get("editing_label") == name else name
+                    st.rerun()
+                if delete_col.button("删除", key=f"delete_{token}", use_container_width=True):
                     try:
-                        store.set_label_color(name, selected_color)
+                        store.delete_label(name)
+                        if name == active:
+                            st.session_state["active_label"] = None
+                        if st.session_state.get("editing_label") == name:
+                            st.session_state["editing_label"] = None
                         st.rerun()
                     except StorageError as exc:
                         st.error(str(exc))
 
-                with st.form(f"rename_form_{name}"):
-                    rename_value = st.text_input("新名称", value=name)
-                    rename = st.form_submit_button("重命名", use_container_width=True)
-                if rename:
-                    if rename_value.strip() == name:
-                        st.info("请输入一个不同的新名称")
-                    else:
+                if st.session_state.get("editing_label") == name:
+                    st.caption("标签设置")
+                    selected_color = st.color_picker("颜色", color, key=f"color_{token}")
+                    selected_style_name = st.radio(
+                        "标记形式",
+                        ["角标", "外框"],
+                        index=0 if label_styles.get(name, "badge") == "badge" else 1,
+                        horizontal=True,
+                        key=f"style_{token}",
+                    )
+                    if st.button("保存设置", key=f"save_settings_{token}", use_container_width=True, type="primary"):
                         try:
-                            store.rename_label(name, rename_value)
-                            if name == active:
-                                st.session_state["pending_active_label"] = rename_value.strip()
+                            store.set_label_color(name, selected_color)
+                            store.set_label_style(name, "badge" if selected_style_name == "角标" else "border")
+                            st.session_state["editing_label"] = None
                             st.rerun()
                         except StorageError as exc:
                             st.error(str(exc))
 
-                confirm_delete = st.checkbox("确认删除此标签", key=f"delete_confirm_{name}")
-                if st.button(
-                    "删除标签",
-                    key=f"delete_{name}",
-                    type="secondary",
-                    use_container_width=True,
-                    disabled=not confirm_delete,
-                ):
-                    try:
-                        store.delete_label(name)
-                        if name == active:
-                            st.session_state["pending_active_label"] = None
-                        st.rerun()
-                    except StorageError as exc:
-                        st.error(str(exc))
+                    with st.form(f"rename_form_{token}"):
+                        rename_value = st.text_input("新名称", value=name)
+                        rename = st.form_submit_button("重命名", use_container_width=True)
+                    if rename:
+                        if rename_value.strip() == name:
+                            st.info("请输入一个不同的新名称")
+                        else:
+                            try:
+                                store.rename_label(name, rename_value)
+                                if name == active:
+                                    st.session_state["pending_active_label"] = rename_value.strip()
+                                st.session_state["editing_label"] = None
+                                st.rerun()
+                            except StorageError as exc:
+                                st.error(str(exc))
 
         st.divider()
-        st.caption("操作提示")
-        st.markdown("选择标签后左键样本即可标记；右键样本可编辑单样本备注；使用 **A / D** 翻页。")
+        st.page_link("pages/操作指南.py", label="打开操作指南", icon="📖", use_container_width=True)
 
     active = st.session_state.get("active_label")
     if active and active in labels:
-        return {"name": active, "color": labels[active]}
+        return {"name": active, "color": labels[active], "style": label_styles.get(active, "badge")}
     return None
 
 
@@ -188,9 +208,10 @@ def main(config: AppConfig) -> None:
     st.markdown(
         """
         <style>
-        .block-container { max-width: 100%; padding-top: 1.2rem; padding-bottom: 1rem; }
+        .block-container { max-width: 100%; padding-top: 1rem; padding-bottom: .5rem; }
         [data-testid="stSidebar"] { border-right: 1px solid rgba(148,163,184,.25); }
-        .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 0 0 12px auto;
+        [data-testid="stSidebarNav"] { display:none; }
+        .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 1.35rem 0 4px auto;
           border: 1px solid rgba(148,163,184,.35); border-radius: 999px; background: rgba(255,255,255,.92);
           box-shadow: 0 6px 22px rgba(15,23,42,.08); backdrop-filter: blur(10px); cursor: default; }
         .status-summary { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 15px; font-size: 13px; font-weight: 650; }
@@ -212,17 +233,19 @@ def main(config: AppConfig) -> None:
     if operation_error:
         st.error(f"上一次操作失败：{operation_error}")
 
-    st.title("实验结果展示与标注")
-    st.caption(str(config.data_dir))
-
-    st.markdown(
-        f"""
-        <div class="status-float" aria-label="数据概况">
-          <div class="status-summary"><i></i><span>{MODE_LABELS[config.mode]}模式</span><span>·</span><span>{len(dataset.entries):,} 个样本</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    header_main, header_status = st.columns([6, 1.35], vertical_alignment="top")
+    with header_main:
+        st.title("实验结果展示与标注")
+        st.caption(str(config.data_dir))
+    with header_status:
+        st.markdown(
+            f"""
+            <div class="status-float" aria-label="数据概况">
+              <div class="status-summary"><i></i><span>{MODE_LABELS[config.mode]}模式</span><span>·</span><span>{len(dataset.entries):,} 个样本</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     if config.mode == "video":
         ok, message = PreviewManager.check_video_tools()
@@ -237,9 +260,6 @@ def main(config: AppConfig) -> None:
     requested_page = int(state_value(component_state, "page", 1))
     page = 1 if total_pages == 0 else max(1, min(total_pages, requested_page))
     show_badges = bool(state_value(component_state, "show_badges", True))
-    marker_style = str(state_value(component_state, "marker_style", "badge"))
-    if marker_style not in {"badge", "border"}:
-        marker_style = "badge"
     entries = dataset.page(page, per_page)
 
     manager = get_preview_manager(str(config.data_dir), config.preview_cache_mb)
@@ -252,6 +272,7 @@ def main(config: AppConfig) -> None:
         )
     filenames = [entry.name for entry in entries]
     labels_by_sample, noted = store.page_state(filenames)
+    label_styles = store.get_label_styles()
     try:
         notes = store.get_notes(filenames)
     except CorruptNotesError as exc:
@@ -267,7 +288,10 @@ def main(config: AppConfig) -> None:
                 "source": preview.source,
                 "notice": preview.notice,
                 "error": preview.error,
-                "labels": labels_by_sample.get(entry.name, []),
+                "labels": [
+                    {**label, "style": label_styles.get(label["name"], "badge")}
+                    for label in labels_by_sample.get(entry.name, [])
+                ],
                 "has_note": entry.name in noted,
                 "note": notes.get(entry.name, {}),
             }
@@ -283,7 +307,6 @@ def main(config: AppConfig) -> None:
             "total_pages": total_pages,
             "total_count": len(dataset.entries),
             "show_badges": show_badges,
-            "marker_style": marker_style,
             "active_label": active_label,
             "label_order": list(store.list_labels()),
         },

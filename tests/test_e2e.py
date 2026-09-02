@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import shutil
 import socket
 import subprocess
@@ -82,11 +83,9 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(page.get_by_text("单样本上限", exact=True)).to_have_count(0)
             expect(page.locator(".status-detail")).to_have_count(0)
 
-            def open_label_card(name: str):
-                card = page.locator("details", has_text=name).first
-                if card.get_attribute("open") is None:
-                    card.locator("summary").click()
-                return card
+            def label_card(name: str):
+                token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
+                return page.locator(f".st-key-label_card_{token}")
 
             page.get_by_role("button", name="＋ 新建标签", exact=True).click()
             page.get_by_label("标签名称").fill("样例标签一")
@@ -109,19 +108,26 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             else:
                 raise AssertionError("batched label operation was not persisted")
 
-            first_card = open_label_card("样例标签一")
-            first_card.get_by_role("button", name="设为当前标签", exact=True).click()
+            first_card = label_card("样例标签一")
+            first_card.get_by_role("button", name="编辑", exact=True).click()
+            first_card.get_by_text("外框", exact=True).click()
+            first_card.get_by_role("button", name="保存设置", exact=True).click()
+            expect(first_card.get_by_text("标记形式", exact=True)).to_have_count(0)
+            first_card.get_by_role("button", name="样例标签一", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签一", timeout=10_000)
             first = page.locator(".sample-card").first
             first.click()
-            expect(first.locator(".badge")).to_have_count(2)
-            assert first.locator(".badge").evaluate_all("nodes => nodes.map(node => node.title)") == ["样例标签一", "样例标签二"]
+            expect(first.locator(".badge")).to_have_count(1)
+            expect(first.locator(".frame-rings")).to_have_count(1)
+            expect(first.locator(".frame-rings")).to_be_visible()
+            assert first.locator(".badge").evaluate_all("nodes => nodes.map(node => node.title)") == ["样例标签二"]
 
-            second_card = open_label_card("样例标签二")
-            second_card.get_by_role("button", name="设为当前标签", exact=True).click()
+            second_card = label_card("样例标签二")
+            second_card.get_by_role("button", name="样例标签二", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二", timeout=10_000)
 
-            second_card = open_label_card("样例标签二")
+            second_card = label_card("样例标签二")
+            second_card.get_by_role("button", name="编辑", exact=True).click()
             second_card.get_by_label("新名称").fill("样例标签二已修改")
             second_card.get_by_role("button", name="重命名", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二已修改", timeout=10_000)
@@ -156,14 +162,6 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(viewer.locator('[data-role="zoom-value"]')).to_have_text("125%")
             viewer.get_by_role("button", name="关闭").click()
 
-            badge_colors = first.locator(".badge").evaluate_all("nodes => nodes.map(node => getComputedStyle(node).backgroundColor)")
-            page.locator(".toolbar label", has_text="标记样式").locator("select").select_option("border")
-            expect(first.locator(".badge")).to_have_count(0)
-            shadow = first.evaluate("card => card.style.boxShadow")
-            assert shadow.index(badge_colors[0]) < shadow.index(badge_colors[1])
-            page.locator(".toolbar label", has_text="标记样式").locator("select").select_option("badge")
-            expect(first.locator(".badge")).to_have_count(2)
-
             page.locator(".sample-card").first.click(button="right")
             page.get_by_role("button", name="📝 单个样本备注").click()
             note = page.locator(".note-dialog textarea")
@@ -180,6 +178,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             badge_toggle = page.locator(".toolbar label", has_text="显示标记").locator("input")
             badge_toggle.uncheck()
             expect(page.locator(".sample-card").first.locator(".badge")).to_have_count(0)
+            expect(page.locator(".sample-card").first.locator(".frame-rings")).to_have_count(0)
 
             rows = page.locator(".toolbar label", has_text="行").locator("input")
             rows.fill("12")
@@ -203,12 +202,14 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(page_input).to_have_value("2", timeout=10_000)
             expect(page.locator(".sample-card")).to_have_count(2)
 
-            renamed_card = open_label_card("样例标签二已修改")
-            renamed_card.get_by_text("确认删除此标签", exact=True).click()
-            delete_button = renamed_card.get_by_role("button", name="删除标签", exact=True)
-            expect(delete_button).to_be_enabled(timeout=10_000)
-            delete_button.click()
-            expect(page.locator("details", has_text="样例标签二已修改")).to_have_count(0)
+            renamed_card = label_card("样例标签二已修改")
+            renamed_card.get_by_role("button", name="删除", exact=True).click()
+            expect(renamed_card).to_have_count(0)
+
+            page.get_by_role("link", name="打开操作指南", exact=True).click()
+            expect(page.get_by_text("📖 操作指南", exact=True)).to_be_visible(timeout=20_000)
+            page.get_by_role("tab", name="标签与标记", exact=True).click()
+            expect(page.get_by_text("角标和外框可以混合使用", exact=True)).to_be_visible()
             browser.close()
     finally:
         process.terminate()

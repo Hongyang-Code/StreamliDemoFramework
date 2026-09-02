@@ -37,24 +37,29 @@ export default function(component) {
 
   function renderMarks(card, sample) {
     card.querySelectorAll('.badges').forEach(node => node.remove());
-    card.style.boxShadow = '';
+    card.querySelectorAll('.frame-rings').forEach(node => node.remove());
     if (!data.show_badges || !sample.labels?.length) return;
     const labels = orderedLabels(sample);
-    if (data.marker_style === 'border') {
-      const rings = labels.map((label, index) => `inset 0 0 0 ${(index + 1) * 3}px ${label.color}`);
-      card.style.boxShadow = `${rings.join(', ')}, 0 4px 16px rgba(15,23,42,.06)`;
-      card.title = labels.map(label => label.name).join('、');
-      return;
+    const borderLabels = labels.filter(label => label.style === 'border');
+    const badgeLabels = labels.filter(label => label.style !== 'border');
+    if (borderLabels.length) {
+      const frame = make('div', 'frame-rings');
+      frame.title = borderLabels.map(label => label.name).join('、');
+      frame.style.boxShadow = borderLabels
+        .map((label, index) => `inset 0 0 0 ${(index + 1) * 4}px ${label.color}`)
+        .join(', ');
+      card.appendChild(frame);
     }
+    if (!badgeLabels.length) return;
     const holder = make('div', 'badges');
-    holder.title = labels.map(label => label.name).join('、');
-    labels.slice(0, 6).forEach(label => {
+    holder.title = badgeLabels.map(label => label.name).join('、');
+    badgeLabels.slice(0, 6).forEach(label => {
       const badge = make('span', 'badge');
       badge.style.backgroundColor = label.color;
       badge.title = label.name;
       holder.appendChild(badge);
     });
-    if (labels.length > 6) holder.appendChild(make('span', 'badge-more', `+${labels.length - 6}`));
+    if (badgeLabels.length > 6) holder.appendChild(make('span', 'badge-more', `+${badgeLabels.length - 6}`));
     card.appendChild(holder);
   }
 
@@ -110,7 +115,7 @@ export default function(component) {
 
   grid.replaceChildren();
   grid.style.gridTemplateColumns = `repeat(${data.cols}, minmax(120px, 1fr))`;
-  grid.style.gridAutoRows = `${Math.max(180, Math.min(340, 620 / Math.max(1, data.rows)))}px`;
+  grid.style.gridAutoRows = `${Math.max(190, Math.min(370, 700 / Math.max(1, data.rows)))}px`;
   empty.hidden = data.samples.length > 0;
   data.samples.forEach(sample => {
     const card = make('article', 'sample-card');
@@ -182,13 +187,6 @@ export default function(component) {
   const badgeLabel = make('label', '', '显示标记');
   const checkbox = make('input'); checkbox.type = 'checkbox'; checkbox.checked = data.show_badges;
   checkbox.onchange = () => setStateValue('show_badges', checkbox.checked); badgeLabel.prepend(checkbox); toolbar.appendChild(badgeLabel);
-  const styleLabel = make('label', '', '标记样式');
-  const styleSelect = make('select');
-  [['badge', '角标'], ['border', '外框']].forEach(([value, textValue]) => {
-    const option = make('option', '', textValue); option.value = value; option.selected = data.marker_style === value; styleSelect.appendChild(option);
-  });
-  styleSelect.onchange = () => setStateValue('marker_style', styleSelect.value);
-  styleLabel.appendChild(styleSelect); toolbar.appendChild(styleLabel);
   const refresh = make('button', 'refresh-button', '↻ 刷新');
   refresh.title = '重新扫描输入目录；刷新后保持当前页';
   refresh.onclick = () => {

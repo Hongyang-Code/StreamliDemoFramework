@@ -101,3 +101,15 @@ def test_batched_memberships_keep_latest_target_state(tmp_path: Path):
         ]
     )
     assert (tmp_path / "label" / "tag.txt").read_text().splitlines() == ["#334455", "b.jpg", "c.jpg"]
+
+
+def test_per_label_style_survives_rename_and_is_removed_on_delete(tmp_path: Path):
+    store = make_store(tmp_path)
+    store.create_label("tag", "#334455")
+    assert store.get_label_styles() == {"tag": "badge"}
+    store.set_label_style("tag", "border")
+    assert store.get_label_styles() == {"tag": "border"}
+    store.rename_label("tag", "renamed")
+    assert store.get_label_styles() == {"renamed": "border"}
+    store.delete_label("renamed")
+    assert store.get_label_styles() == {}

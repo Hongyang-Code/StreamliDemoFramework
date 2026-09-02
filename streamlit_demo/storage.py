@@ -16,7 +16,7 @@ from typing import Iterable
 
 COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
-RESERVED_LABELS = {"sample_notes", ".label_index", ".store"}
+RESERVED_LABELS = {"sample_notes", "label_settings", ".label_index", ".store"}
 
 
 class StorageError(RuntimeError):
@@ -75,6 +75,7 @@ class LabelStore:
         self.label_dir = label_dir.resolve()
         self.label_dir.mkdir(parents=True, exist_ok=True)
         self.notes_path = self.label_dir / "sample_notes.json"
+        self.settings_path = self.label_dir / "label_settings.json"
         self.index_path = self.label_dir / ".label_index.sqlite3"
         self.lock_path = self.label_dir / ".store.lock"
         self.valid_samples = frozenset(valid_samples)
@@ -197,6 +198,43 @@ class LabelStore:
         with self._connect() as connection:
             return dict(connection.execute("SELECT name, color FROM labels ORDER BY name COLLATE NOCASE"))
 
+    @staticmethod
+    def _empty_label_settings() -> dict:
+        return {"version": 1, "labels": {}}
+
+    def _load_label_settings(self) -> dict:
+        if not self.settings_path.exists():
+            return self._empty_label_settings()
+        try:
+            value = json.loads(self.settings_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise StorageError("label_settings.json 已损坏，请修复或备份后再修改标签设置") from exc
+        if value.get("version") != 1 or not isinstance(value.get("labels"), dict):
+            raise StorageError("label_settings.json 结构不受支持或缺少 version/labels")
+        return value
+
+    def get_label_styles(self) -> dict[str, str]:
+        with self._lock():
+            settings = self._load_label_settings()
+        labels = self.list_labels()
+        return {
+            name: settings["labels"].get(name, {}).get("style", "badge")
+            if settings["labels"].get(name, {}).get("style", "badge") in {"badge", "border"}
+            else "badge"
+            for name in labels
+        }
+
+    def set_label_style(self, name: str, style: str) -> None:
+        name = validate_label_name(name)
+        if style not in {"badge", "border"}:
+            raise StorageError("标签样式只能是角标或外框")
+        with self._lock():
+            if not (self.label_dir / f"{name}.txt").exists():
+                raise StorageError("标签不存在")
+            settings = self._load_label_settings()
+            settings["labels"].setdefault(name, {})["style"] = style
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
+
     def page_state(self, samples: Iterable[str]) -> tuple[dict[str, list[dict[str, str]]], set[str]]:
         names = list(samples)
         if not names:
@@ -240,7 +278,11 @@ class LabelStore:
                 raise StorageError("原标签不存在")
             if new_path.exists():
                 raise StorageError("新标签名已存在")
+            settings = self._load_label_settings()
             os.replace(old_path, new_path)
+            if old_name in settings["labels"]:
+                settings["labels"][new_name] = settings["labels"].pop(old_name)
+                _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
         self.refresh_index(force=True)
 
     def delete_label(self, name: str) -> None:
@@ -249,7 +291,10 @@ class LabelStore:
             path = self.label_dir / f"{name}.txt"
             if not path.exists():
                 raise StorageError("标签不存在")
+            settings = self._load_label_settings()
             path.unlink()
+            if settings["labels"].pop(name, None) is not None:
+                _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
         self.refresh_index(force=True)
 
     def set_label_color(self, name: str, color: str) -> None:

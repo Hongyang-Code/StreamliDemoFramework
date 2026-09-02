@@ -17,8 +17,8 @@ def test_component_contains_required_interactions():
         "openViewer",
         "type: 'refresh'",
         "membership_batch",
-        "marker_style",
         "orderedLabels",
+        "frame-rings",
     ):
         assert contract in javascript
 
