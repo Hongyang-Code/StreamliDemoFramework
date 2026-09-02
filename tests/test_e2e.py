@@ -84,8 +84,15 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(page.locator(".active-label")).to_have_text("当前标签：待复核", timeout=30_000)
 
             first = page.locator(".sample-card").first
-            first.click()
-            expect(first.locator(".badge")).to_have_count(1, timeout=10_000)
+            optimistic = first.evaluate(
+                """card => {
+                    const started = performance.now();
+                    card.click();
+                    return {elapsed: performance.now() - started, badges: card.querySelectorAll('.badge').length};
+                }"""
+            )
+            assert optimistic["badges"] == 1
+            assert optimistic["elapsed"] < 100
             label_path = data_dir / "label" / "待复核.txt"
             save_deadline = time.monotonic() + 10
             while time.monotonic() < save_deadline:

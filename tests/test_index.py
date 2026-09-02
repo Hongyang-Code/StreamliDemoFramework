@@ -1,3 +1,4 @@
+import resource
 from pathlib import Path
 
 from streamlit_demo.index import DatasetIndex, FileEntry
@@ -37,6 +38,9 @@ def test_hundred_thousand_entry_pagination_stays_bounded(tmp_path: Path):
         for number in range(100_000)
     )
     index._names = frozenset()
+    rss_before_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     pages = [index.page(page, 24) for page in range(1, 101)]
+    rss_after_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     assert all(len(page) == 24 for page in pages)
     assert sum(len(page) for page in pages) == 2_400
+    assert rss_after_kb - rss_before_kb < 100 * 1024
