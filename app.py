@@ -208,7 +208,7 @@ def main(config: AppConfig) -> None:
     st.markdown(
         """
         <style>
-        .block-container { max-width: 100%; padding-top: 1rem; padding-bottom: .5rem; }
+        .block-container { max-width: 100%; padding-top: 2.35rem; padding-bottom: .5rem; }
         [data-testid="stSidebar"] { border-right: 1px solid rgba(148,163,184,.25); }
         [data-testid="stSidebarNav"] { display:none; }
         .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 1.35rem 0 4px auto;
