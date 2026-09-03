@@ -246,6 +246,11 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             renamed_card = label_card("样例标签二已修改")
             renamed_card.get_by_role("button", name="删除", exact=True).click()
             expect(renamed_card).to_have_count(0)
+            expect(page.locator(".toolbar label", has_text="行").locator("input")).to_have_value("2")
+            expect(page.locator(".toolbar label", has_text="列").locator("input")).to_have_value("1")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
+            expect(page.locator(".toolbar")).to_contain_text("/ 15 页")
+            expect(page.locator(".sample-card")).to_have_count(2)
 
             page.locator(".st-key-sidebar_guide").get_by_test_id("stTooltipHoverTarget").get_by_test_id(
                 "stPageLink-NavLink"

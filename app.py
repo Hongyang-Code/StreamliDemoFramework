@@ -16,6 +16,7 @@ from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, 
 
 MODE_LABELS = {"image": "图片", "video": "视频", "text": "文本"}
 DEFAULT_LAYOUTS = {"image": (2, 3), "video": (1, 2), "text": (2, 2)}
+GRID_VIEW_KEYS = ("rows", "cols", "page", "show_badges")
 
 
 @st.cache_resource(show_spinner=False)
@@ -36,6 +37,25 @@ def state_value(state, key: str, default):
     else:
         value = getattr(state, key, default)
     return default if value is None else value
+
+
+def remember_grid_view(state) -> None:
+    """Copy component-owned view settings into durable session keys.
+
+    Sidebar actions can call ``st.rerun`` before the component is mounted. In
+    that run Streamlit may discard the widget state, so layout state must not
+    live only inside the component.
+    """
+    if state is None:
+        return
+    for key in GRID_VIEW_KEYS:
+        value = state_value(state, key, None)
+        if value is not None:
+            st.session_state[f"grid_view_{key}"] = value
+
+
+def grid_view_value(key: str, default):
+    return st.session_state.get(f"grid_view_{key}", default)
 
 
 def render_create_label_form(store: LabelStore) -> None:
@@ -244,6 +264,7 @@ def main(config: AppConfig) -> None:
         dataset.refresh()
     store = LabelStore(config.label_dir, dataset.names)
     component_state = st.session_state.get("sample_grid")
+    remember_grid_view(component_state)
     handle_component_action(component_state, store, dataset)
 
     active_label = render_sidebar(store)
@@ -271,13 +292,17 @@ def main(config: AppConfig) -> None:
             st.error(message)
 
     default_rows, default_cols = DEFAULT_LAYOUTS[config.mode]
-    rows = max(1, int(state_value(component_state, "rows", default_rows)))
-    cols = max(1, int(state_value(component_state, "cols", default_cols)))
+    rows = max(1, int(grid_view_value("rows", default_rows)))
+    cols = max(1, int(grid_view_value("cols", default_cols)))
     per_page = rows * cols
     total_pages = math.ceil(len(dataset.entries) / per_page) if dataset.entries else 0
-    requested_page = int(state_value(component_state, "page", 1))
+    requested_page = int(grid_view_value("page", 1))
     page = 1 if total_pages == 0 else max(1, min(total_pages, requested_page))
-    show_badges = bool(state_value(component_state, "show_badges", True))
+    show_badges = bool(grid_view_value("show_badges", True))
+    st.session_state["grid_view_rows"] = rows
+    st.session_state["grid_view_cols"] = cols
+    st.session_state["grid_view_page"] = page
+    st.session_state["grid_view_show_badges"] = show_badges
     entries = dataset.page(page, per_page)
 
     manager = get_preview_manager(str(config.data_dir), config.preview_cache_mb)
