@@ -7,6 +7,7 @@ export default function(component) {
   const toolbarBefore = root.querySelector('[data-role="toolbar-before"]');
   const toolbarAfter = root.querySelector('[data-role="toolbar-after"]');
   const searchWrap = root.querySelector('.toolbar-search');
+  const suggestions = root.querySelector('[data-role="search-suggestions"]');
   const menu = root.querySelector('[data-role="context"]');
   const dialog = root.querySelector('[data-role="note-dialog"]');
   const viewer = root.querySelector('[data-role="viewer-dialog"]');
@@ -37,30 +38,25 @@ export default function(component) {
   ownerWindow.addEventListener('resize', fitToViewport);
   ownerWindow.visualViewport?.addEventListener('resize', fitToViewport);
 
-  const searchHost = ownerWindow.document.querySelector('.st-key-filename_search_component');
-  const searchFrame = searchHost?.querySelector('iframe');
-  let searchResizeObserver = null;
-  let searchMutationObserver = null;
+  let searchHost = null;
+  let searchInput = null;
+  let searchCleanup = null;
+  let searchPositionFrame = 0;
+  let searchBindAttempts = 0;
   const positionSearchHost = () => {
-    if (!searchHost || !searchFrame || !searchWrap) return;
+    if (!searchHost || !searchInput || !searchWrap) return;
     const rect = searchWrap.getBoundingClientRect();
-    const frameHeight = Math.max(31, Number(searchFrame.getAttribute('height')) || searchFrame.offsetHeight || 31);
     searchHost.style.setProperty('position', 'fixed', 'important');
     searchHost.style.setProperty('left', `${rect.left}px`, 'important');
-    searchHost.style.setProperty('top', `${rect.bottom - frameHeight}px`, 'important');
+    searchHost.style.setProperty('top', `${rect.top}px`, 'important');
     searchHost.style.setProperty('width', `${rect.width}px`, 'important');
-    searchHost.style.setProperty('height', `${frameHeight}px`, 'important');
+    searchHost.style.setProperty('height', `${rect.height}px`, 'important');
     searchHost.style.setProperty('z-index', '1001', 'important');
+    const rootRect = searchHost.getBoundingClientRect();
+    const inputRect = searchInput.getBoundingClientRect();
+    const inputOffset = inputRect.top - rootRect.top;
+    searchHost.style.setProperty('top', `${rect.top + (rect.height - inputRect.height) / 2 - inputOffset}px`, 'important');
   };
-  if (searchFrame) {
-    searchResizeObserver = new ResizeObserver(positionSearchHost);
-    searchResizeObserver.observe(searchFrame);
-    searchMutationObserver = new MutationObserver(positionSearchHost);
-    searchMutationObserver.observe(searchFrame, {attributes: true, attributeFilter: ['height']});
-    ownerWindow.addEventListener('resize', positionSearchHost);
-    ownerWindow.addEventListener('scroll', positionSearchHost, true);
-    ownerWindow.requestAnimationFrame(positionSearchHost);
-  }
 
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -247,6 +243,107 @@ export default function(component) {
   const activeStatus = make('span', 'active-label', data.active_label ? `当前标签：${data.active_label.name}` : '当前标签：未选择');
   if (data.active_label) activeStatus.style.color = data.active_label.color;
   toolbarBefore.appendChild(activeStatus);
+
+  const hideSearchSuggestions = () => { suggestions.hidden = true; };
+  const navigateSearch = (name = '') => {
+    const selectedIndex = Number.isInteger(root._searchSelected) && root._searchSelected >= 0 ? root._searchSelected : 0;
+    const sample = name || data.search_results?.[selectedIndex] || '';
+    if (!sample || !searchInput) return;
+    hideSearchSuggestions();
+    setTriggerValue('action', {type: 'search_navigate', op_id: opId(), query: searchInput.value, sample});
+  };
+  const renderSearchSuggestions = () => {
+    if (!searchInput) return;
+    const query = searchInput.value.trim();
+    suggestions.replaceChildren();
+    if (!query || root._searchComposing || ownerWindow.document.activeElement !== searchInput) return hideSearchSuggestions();
+    if (query !== String(data.search_query || '')) {
+      suggestions.appendChild(make('div', 'search-message', '正在查找…'));
+    } else if (!data.search_results?.length) {
+      suggestions.appendChild(make('div', 'search-message', '没有匹配的文件'));
+    } else {
+      root._searchSelected = Math.max(-1, Math.min(root._searchSelected ?? -1, data.search_results.length - 1));
+      data.search_results.forEach((name, index) => {
+        const option = make('button', `search-option${index === root._searchSelected ? ' selected' : ''}`, name);
+        option.type = 'button'; option.role = 'option';
+        option.setAttribute('aria-selected', index === root._searchSelected ? 'true' : 'false');
+        option.addEventListener('mousedown', event => event.preventDefault());
+        option.addEventListener('click', () => navigateSearch(name));
+        suggestions.appendChild(option);
+      });
+    }
+    suggestions.hidden = false;
+  };
+  const sendSearch = (delay = 250) => {
+    clearTimeout(root._searchTimer);
+    const query = String(searchInput?.value || '');
+    root._searchSelected = -1;
+    renderSearchSuggestions();
+    root._searchTimer = setTimeout(() => {
+      if (root._searchComposing) return;
+      setTriggerValue('action', {type: 'search', op_id: opId(), query});
+    }, delay);
+  };
+  const bindNativeSearch = () => {
+    searchHost = ownerWindow.document.querySelector('.st-key-native_filename_search');
+    searchInput = searchHost?.querySelector('input') || null;
+    if (!searchHost || !searchInput) {
+      if (searchBindAttempts++ < 120) searchPositionFrame = ownerWindow.requestAnimationFrame(bindNativeSearch);
+      return;
+    }
+    searchInput._gridSearchCleanup?.();
+    const compositionStart = () => {
+      root._searchComposing = true; clearTimeout(root._searchTimer); hideSearchSuggestions();
+    };
+    const compositionEnd = () => {
+      root._searchComposing = false; sendSearch(0);
+    };
+    const beforeInput = event => {
+      if (event.isComposing || String(event.inputType || '').includes('Composition')) compositionStart();
+    };
+    const inputChanged = event => {
+      if (root._searchComposing || event.isComposing || String(event.inputType || '').includes('Composition')) return;
+      sendSearch();
+    };
+    const searchKeys = event => {
+      if (event.keyCode === 229) { compositionStart(); return; }
+      if (root._searchComposing || event.isComposing) return;
+      const matches = data.search_results || [];
+      if (event.key === 'ArrowDown' && matches.length) root._searchSelected = Math.min(matches.length - 1, (root._searchSelected ?? -1) + 1);
+      else if (event.key === 'ArrowUp' && matches.length) root._searchSelected = Math.max(0, root._searchSelected < 0 ? 0 : root._searchSelected - 1);
+      else if (event.key === 'Enter' && matches.length && searchInput.value.trim() === String(data.search_query || '')) {
+        event.preventDefault(); event.stopPropagation(); navigateSearch(); return;
+      } else if (event.key === 'Escape') { hideSearchSuggestions(); return; }
+      else return;
+      event.preventDefault(); event.stopPropagation(); renderSearchSuggestions();
+    };
+    const searchFocus = renderSearchSuggestions;
+    const searchBlur = () => setTimeout(hideSearchSuggestions, 120);
+    searchInput.addEventListener('compositionstart', compositionStart);
+    searchInput.addEventListener('compositionend', compositionEnd);
+    searchInput.addEventListener('beforeinput', beforeInput);
+    searchInput.addEventListener('input', inputChanged);
+    searchInput.addEventListener('keydown', searchKeys, true);
+    searchInput.addEventListener('focus', searchFocus);
+    searchInput.addEventListener('blur', searchBlur);
+    searchCleanup = () => {
+      searchInput.removeEventListener('compositionstart', compositionStart);
+      searchInput.removeEventListener('compositionend', compositionEnd);
+      searchInput.removeEventListener('beforeinput', beforeInput);
+      searchInput.removeEventListener('input', inputChanged);
+      searchInput.removeEventListener('keydown', searchKeys, true);
+      searchInput.removeEventListener('focus', searchFocus);
+      searchInput.removeEventListener('blur', searchBlur);
+      if (searchInput._gridSearchCleanup === searchCleanup) delete searchInput._gridSearchCleanup;
+    };
+    searchInput._gridSearchCleanup = searchCleanup;
+    ownerWindow.addEventListener('resize', positionSearchHost);
+    ownerWindow.addEventListener('scroll', positionSearchHost, true);
+    searchPositionFrame = ownerWindow.requestAnimationFrame(positionSearchHost);
+    renderSearchSuggestions();
+  };
+  bindNativeSearch();
+
   const numberInput = (labelText, value, min, max, callback) => {
     const label = make('label', '', labelText);
     const input = make('input'); input.type = 'number'; input.min = min; input.value = value;
@@ -326,8 +423,8 @@ export default function(component) {
   document.addEventListener('click', dismissMenu);
   document.addEventListener('keydown', keyboard);
   return () => {
-    searchResizeObserver?.disconnect();
-    searchMutationObserver?.disconnect();
+    if (searchCleanup && searchInput?._gridSearchCleanup === searchCleanup) searchCleanup();
+    ownerWindow.cancelAnimationFrame(searchPositionFrame);
     ownerWindow.removeEventListener('resize', positionSearchHost);
     ownerWindow.removeEventListener('scroll', positionSearchHost, true);
     document.removeEventListener('click', dismissMenu);

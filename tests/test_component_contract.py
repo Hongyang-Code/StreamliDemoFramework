@@ -6,7 +6,6 @@ ASSETS = Path(__file__).parents[1] / "streamlit_demo" / "assets"
 
 def test_component_contains_required_interactions():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
-    search_html = (ASSETS / "filename_search" / "index.html").read_text(encoding="utf-8")
     for contract in (
         "contextmenu",
         "setTriggerValue('action'",
@@ -20,10 +19,13 @@ def test_component_contains_required_interactions():
         "membership_batch",
         "orderedLabels",
         "frame-rings",
+        "search_navigate",
+        "compositionstart",
+        "compositionend",
+        "event.keyCode === 229",
+        "ArrowDown",
     ):
         assert contract in javascript
-    for contract in ("search_navigate", "compositionstart", "compositionend", "event.isComposing", "ArrowDown"):
-        assert contract in search_html
 
 
 def test_component_uses_safe_text_rendering():
@@ -57,30 +59,28 @@ def test_component_tracks_the_actual_browser_viewport():
 
 
 def test_search_input_is_persistent_for_real_ime_composition():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
     html = (ASSETS / "grid.html").read_text(encoding="utf-8")
-    search_html = (ASSETS / "filename_search" / "index.html").read_text(encoding="utf-8")
     app = (ASSETS.parents[1] / "app.py").read_text(encoding="utf-8")
-    assert 'class="toolbar-search"' in html
-    assert "search-frame" not in html
-    assert 'role="combobox"' in search_html
-    assert "input.addEventListener('compositionstart'" in search_html
-    assert "input.addEventListener('compositionend'" in search_html
-    assert "if (!composing && !event.isComposing)" in search_html
-    assert 'handle_component_action({"action": search_state}' in app
+    assert 'data-role="search-suggestions"' in html
+    assert ".st-key-native_filename_search" in javascript
+    assert "searchInput.addEventListener('compositionstart'" in javascript
+    assert "searchInput.addEventListener('compositionend'" in javascript
+    assert "searchInput.addEventListener('beforeinput'" in javascript
+    assert 'key="native_filename_search_value"' in app
+    assert "on_change=submit_native_filename_search" in app
 
 
 def test_search_does_not_wrap_or_reserve_an_iframe_layer():
     css = (ASSETS / "grid.css").read_text(encoding="utf-8")
     component = (ASSETS.parents[1] / "streamlit_demo" / "component.py").read_text(encoding="utf-8")
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
-    search_html = (ASSETS / "filename_search" / "index.html").read_text(encoding="utf-8")
     assert "flex-wrap: nowrap" in css
     assert ".search-frame" not in css
     assert "SEARCH_FRAME_DOCUMENT" not in component
     assert not (ASSETS / "search_frame.html").exists()
-    assert "rect.bottom - frameHeight" in javascript
     assert "position', 'fixed'" in javascript
-    assert "setHeight(resultsBox.hidden ? 31 : 276)" in search_html
+    assert not (ASSETS / "filename_search" / "index.html").exists()
 
 
 def test_label_manager_supports_long_press_reordering_and_editing():

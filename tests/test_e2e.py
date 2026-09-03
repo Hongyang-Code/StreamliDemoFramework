@@ -295,9 +295,25 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             assert "grid_page=2" in page.url
             assert "grid_marks=0" in page.url
 
-            search_frame = page.frame_locator(".st-key-filename_search_component iframe")
-            search = search_frame.get_by_role("combobox", name="检索文件名")
+            search = page.get_by_role("textbox", name="检索文件名")
             search.focus()
+            search.evaluate(
+                """input => {
+                    input.dataset.imeProbe = 'same-node';
+                    const key = new KeyboardEvent('keydown', {key: 'Process', bubbles: true});
+                    Object.defineProperty(key, 'keyCode', {value: 229});
+                    input.dispatchEvent(key);
+                    input.value = 'a';
+                    input.dispatchEvent(new InputEvent('input', {
+                        data: 'a', inputType: 'insertText', isComposing: false, bubbles: true,
+                    }));
+                }"""
+            )
+            page.wait_for_timeout(500)
+            expect(search).to_have_value("a")
+            expect(search).to_have_attribute("data-ime-probe", "same-node")
+            expect(page.locator("button.search-option[role=option]")).to_have_count(0)
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
             search.evaluate(
                 """input => {
                     input.dispatchEvent(new CompositionEvent('compositionstart', {data: '', bubbles: true}));
@@ -309,33 +325,33 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             )
             page.wait_for_timeout(250)
             expect(search).to_have_value("样例图片_05")
-            expect(search_frame.locator("button[role=option]")).to_have_count(0)
+            expect(page.locator("button.search-option[role=option]")).to_have_count(0)
             search.press("Enter")
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
             search.evaluate(
                 "input => input.dispatchEvent(new CompositionEvent('compositionend', "
                 "{data: '样例图片_05', bubbles: true}))"
             )
-            expect(search_frame.locator("button[role=option]")).to_have_count(1, timeout=10_000)
-            expect(search_frame.locator("button[role=option]").first).to_be_visible()
+            expect(page.locator("button.search-option[role=option]")).to_have_count(1, timeout=10_000)
+            expect(page.locator("button.search-option[role=option]").first).to_be_visible()
             search.press("Enter")
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("4", timeout=30_000)
             expect(page.locator('.sample-card[data-sample="样例图片_05.png"]')).to_be_visible()
 
             search.fill("彩色测试图")
-            expect(search_frame.locator("button[role=option]")).to_have_count(1, timeout=10_000)
-            expect(search_frame.locator("button[role=option]").first).to_be_visible()
+            expect(page.locator("button.search-option[role=option]")).to_have_count(1, timeout=10_000)
+            expect(page.locator("button.search-option[role=option]").first).to_be_visible()
             search.press("Enter")
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("1", timeout=30_000)
             expect(page.locator('.sample-card[data-sample="彩色测试图.jpg"]')).to_be_visible()
             search.fill("样例图片_2")
-            suggestions = search_frame.locator("button[role=option]")
+            suggestions = page.locator("button.search-option[role=option]")
             expect(suggestions).to_have_count(8, timeout=10_000)
             expect(suggestions.first).to_be_visible()
             search.press("ArrowDown")
-            expect(search_frame.locator("button.selected")).to_have_text("样例图片_20.png")
+            expect(page.locator("button.search-option.selected")).to_have_text("样例图片_20.png")
             search.press("ArrowDown")
-            expect(search_frame.locator("button.selected")).to_have_text("样例图片_21.png")
+            expect(page.locator("button.search-option.selected")).to_have_text("样例图片_21.png")
             search.press("Enter")
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("12", timeout=30_000)
             expect(page.locator('.sample-card[data-sample="样例图片_21.png"]')).to_have_class(
