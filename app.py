@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from streamlit_demo.component import render_label_manager, render_sample_grid
+from streamlit_demo.component import render_filename_search, render_label_manager, render_sample_grid
 from streamlit_demo.config import AppConfig, parse_args
 from streamlit_demo.index import DatasetIndex
 from streamlit_demo.media import PreviewManager
@@ -294,11 +294,9 @@ def main(config: AppConfig) -> None:
         [data-testid="stSidebar"] .st-key-sidebar_guide a { min-height:34px; border:0; color:#64748b; justify-content:flex-start; padding:.3rem .35rem; }
         [data-testid="stSidebar"] .st-key-sidebar_guide a:hover { color:var(--text-color); background:rgba(148,163,184,.10); }
         .st-key-enter_create_submit { display:none!important; }
-        .st-key-native_filename_search { position:fixed!important; left:-1000px; top:-1000px; z-index:1001;
-          width:190px; margin:0!important; padding:0!important; }
-        .st-key-native_filename_search [data-testid="stVerticalBlock"] { gap:0!important; }
-        .st-key-native_filename_search [data-testid="stTextInput"] { margin:0!important; }
-        .st-key-native_filename_search input { min-height:31px!important; height:31px!important; padding-top:4px!important; padding-bottom:4px!important; }
+        .st-key-filename_search_component { position:fixed!important; left:-1000px; top:-1000px; z-index:1001;
+          width:190px; height:31px; margin:0!important; padding:0!important; }
+        .st-key-filename_search_component iframe { display:block; width:100%!important; border:0; }
         .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 1.35rem 0 4px auto;
           border: 1px solid rgba(148,163,184,.35); border-radius: 999px; background: rgba(255,255,255,.92);
           box-shadow: 0 6px 22px rgba(15,23,42,.08); backdrop-filter: blur(10px); cursor: default; }
@@ -393,13 +391,16 @@ def main(config: AppConfig) -> None:
             }
         )
 
-    with st.container(key="native_filename_search"):
-        st.text_input(
-            "检索文件名",
-            key="native_filename_search_value",
-            placeholder="检索文件名",
-            label_visibility="collapsed",
+    with st.container(key="filename_search_component"):
+        search_state = render_filename_search(
+            query=st.session_state.get("search_query", ""),
+            results=st.session_state.get("search_results", []),
         )
+    search_action = state_value(search_state, "type", None)
+    search_op_id = state_value(search_state, "op_id", None)
+    if search_action and search_op_id not in st.session_state.setdefault("processed_operation_ids", []):
+        handle_component_action({"action": search_state}, store, dataset)
+        st.rerun()
 
     render_sample_grid(
         rows=rows,

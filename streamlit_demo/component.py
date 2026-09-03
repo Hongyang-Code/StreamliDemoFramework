@@ -3,9 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 ASSET_DIR = Path(__file__).parent / "assets"
+
+filename_search_component = components.declare_component(
+    "filename_search",
+    path=ASSET_DIR / "filename_search",
+)
 
 
 def _read(name: str) -> str:
@@ -50,4 +56,13 @@ def render_label_manager(*, data: dict, key: str = "label_manager"):
         on_action_change=lambda: None,
         key=key,
         height="content",
+    )
+
+
+def render_filename_search(*, query: str, results: list[str], key: str = "filename_search"):
+    return filename_search_component(
+        query=query,
+        results=results,
+        default={},
+        key=key,
     )
