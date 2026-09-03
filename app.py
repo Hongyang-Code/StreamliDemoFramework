@@ -216,7 +216,7 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
 
 
 def main(config: AppConfig) -> None:
-    st.set_page_config(page_title="实验结果展示与标注", page_icon="🧭", layout="wide")
+    st.set_page_config(page_title=config.title, page_icon="🧭", layout="wide")
     st.markdown(
         """
         <style>
@@ -253,7 +253,7 @@ def main(config: AppConfig) -> None:
 
     header_main, header_status = st.columns([6, 1.35], vertical_alignment="top")
     with header_main:
-        st.title("实验结果展示与标注")
+        st.title(config.title)
         st.caption(str(config.data_dir))
     with header_status:
         st.markdown(

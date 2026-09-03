@@ -14,4 +14,5 @@ if [[ ! -x "${python_bin}" ]]; then python_bin="python"; fi
   --server.port 10081 \
   -- \
   --mode image \
+  --title "图片实验结果展示与标注" \
   --data-dir "${project_root}/sample_data/image"

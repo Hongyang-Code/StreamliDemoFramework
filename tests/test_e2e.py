@@ -47,6 +47,8 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
         "--",
         "--mode",
         "image",
+        "--title",
+        "自动化测试标题",
         "--data-dir",
         str(data_dir),
     ]
@@ -75,7 +77,8 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             browser = playwright.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
             page.goto(url, wait_until="networkidle")
-            expect(page.get_by_text("实验结果展示与标注", exact=True).first).to_be_visible(timeout=30_000)
+            expect(page.get_by_text("自动化测试标题", exact=True).first).to_be_visible(timeout=30_000)
+            expect(page).to_have_title("自动化测试标题")
             cards = page.locator(".sample-card")
             expect(cards).to_have_count(6, timeout=30_000)
             expect(page.get_by_text("图片模式", exact=True)).to_be_visible()

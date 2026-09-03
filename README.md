@@ -63,6 +63,7 @@ python -m streamlit run app.py \
   --server.port 10081 \
   -- \
   --mode image \
+  --title "我的实验结果" \
   --data-dir /absolute/path/to/flat/data
 ```
 
@@ -72,6 +73,7 @@ python -m streamlit run app.py \
 
 | 参数 | 必填 | 说明 |
 |---|---:|---|
+| `--title TEXT` | 否 | 页面大标题和浏览器标签页标题，默认“实验结果展示与标注” |
 | `--mode image\|video\|text` | 是 | 当前进程的模态 |
 | `--data-dir PATH` | 是 | 所有输入文件平铺所在的一级目录 |
 | `--preview-limit-mb N` | 否 | 单样本预览上限；图片 8、视频 32、文本 1 MB |

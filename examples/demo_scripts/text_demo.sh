@@ -14,4 +14,5 @@ if [[ ! -x "${python_bin}" ]]; then python_bin="python"; fi
   --server.port 10083 \
   -- \
   --mode text \
+  --title "文本实验结果展示与标注" \
   --data-dir "${project_root}/sample_data/text"

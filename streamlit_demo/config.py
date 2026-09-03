@@ -6,10 +6,12 @@ from pathlib import Path
 
 
 DEFAULT_PREVIEW_LIMITS = {"image": 8.0, "video": 32.0, "text": 1.0}
+DEFAULT_TITLE = "实验结果展示与标注"
 
 
 @dataclass(frozen=True)
 class AppConfig:
+    title: str
     mode: str
     data_dir: Path
     label_dir: Path
@@ -20,6 +22,7 @@ class AppConfig:
 
 def parse_args(argv: list[str] | None = None) -> AppConfig:
     parser = argparse.ArgumentParser(description="Streamlit 多模态实验结果展示与标注工具")
+    parser.add_argument("--title", default=DEFAULT_TITLE, help=f"页面标题，默认：{DEFAULT_TITLE}")
     parser.add_argument("--mode", required=True, choices=("image", "video", "text"))
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--preview-limit-mb", type=float)
@@ -28,6 +31,11 @@ def parse_args(argv: list[str] | None = None) -> AppConfig:
     args = parser.parse_args(argv)
 
     data_dir = args.data_dir.expanduser().resolve()
+    title = args.title.strip()
+    if not title:
+        parser.error("--title 不能为空")
+    if any(ord(character) < 32 or ord(character) == 127 for character in title):
+        parser.error("--title 不能包含控制字符")
     if not data_dir.is_dir():
         parser.error(f"数据目录不存在或不是目录: {data_dir}")
     if args.preview_limit_mb is not None and args.preview_limit_mb <= 0:
@@ -45,6 +53,7 @@ def parse_args(argv: list[str] | None = None) -> AppConfig:
         parser.error(f"标签目录不可写: {label_dir}: {exc}")
 
     return AppConfig(
+        title=title,
         mode=args.mode,
         data_dir=data_dir,
         label_dir=label_dir,
