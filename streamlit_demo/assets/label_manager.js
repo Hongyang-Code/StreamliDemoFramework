@@ -14,8 +14,17 @@ export default function(component) {
     return node;
   };
 
+  const backendLabels = [...(data.labels || [])];
+  const backendOrder = backendLabels.map(label => label.name);
+  const sameOrder = (left, right) => left.length === right.length && left.every((name, index) => name === right[index]);
+  if (root._optimisticOrder && sameOrder(root._optimisticOrder, backendOrder)) root._optimisticOrder = null;
+  const labelByName = new Map(backendLabels.map(label => [label.name, label]));
+  const optimisticOrder = (root._optimisticOrder || []).filter(name => labelByName.has(name));
+  const renderedLabels = optimisticOrder.map(name => labelByName.get(name));
+  renderedLabels.push(...backendLabels.filter(label => !optimisticOrder.includes(label.name)));
+
   root.replaceChildren();
-  (data.labels || []).forEach(label => {
+  renderedLabels.forEach(label => {
     const card = make('section', `label-card st-key-label_card_${label.token}`);
     card.dataset.label = label.name;
     card.style.setProperty('--label-color', label.color);
@@ -87,13 +96,15 @@ export default function(component) {
       if (!dragged) return;
       dragged.classList.remove('drag-ready'); dragged = null;
       if (row.hasPointerCapture(event.pointerId)) row.releasePointerCapture(event.pointerId);
-      emit({type: 'reorder', order: [...root.querySelectorAll('.label-card')].map(item => item.dataset.label)});
+      const order = [...root.querySelectorAll('.label-card')].map(item => item.dataset.label);
+      root._optimisticOrder = order;
+      emit({type: 'reorder', order});
     };
     row.onpointerup = finishPointer;
     row.onpointercancel = finishPointer;
     root.appendChild(card);
   });
-  if ((data.labels || []).length > 1) root.appendChild(make('div', 'drag-hint', '长按标签卡片后可上下拖动排序'));
+  if (renderedLabels.length > 1) root.appendChild(make('div', 'drag-hint', '长按标签卡片后可上下拖动排序'));
 
   return () => clearTimeout(pressTimer);
 }

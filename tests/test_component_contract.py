@@ -61,6 +61,7 @@ def test_label_manager_supports_long_press_reordering_and_editing():
         "type: 'select'",
         "type: 'delete'",
         "type: 'update'",
+        "root._optimisticOrder",
         "320",
     ):
         assert contract in javascript

@@ -106,6 +106,15 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
 
             first_card = label_card("样例标签一")
             second_card = label_card("样例标签二")
+            page.locator(".label-manager").evaluate(
+                """root => {
+                    root._orderHistory = [];
+                    root._orderObserver = new MutationObserver(() => {
+                        root._orderHistory.push([...root.querySelectorAll('.label-card')].map(card => card.dataset.label));
+                    });
+                    root._orderObserver.observe(root, {childList: true});
+                }"""
+            )
             source_box = second_card.get_by_role("button", name="样例标签二", exact=True).bounding_box()
             target_box = first_card.bounding_box()
             assert source_box and target_box
@@ -123,6 +132,10 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
                 time.sleep(0.05)
             else:
                 raise AssertionError("dragged label order was not persisted")
+            page.wait_for_timeout(300)
+            order_history = page.locator(".label-manager").evaluate("root => root._orderHistory")
+            first_new_order = order_history.index(["样例标签二", "样例标签一"])
+            assert ["样例标签一", "样例标签二"] not in order_history[first_new_order + 1 :]
 
             label_boxes = page.locator('[class*="st-key-label_card_"]').evaluate_all(
                 "cards => cards.map(card => ({top: card.getBoundingClientRect().top, bottom: card.getBoundingClientRect().bottom}))"
@@ -283,7 +296,12 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             page.get_by_role("button", name="＋ 新建标签", exact=True).click()
             page.get_by_label("标签名称").fill("回收颜色测试")
             page.get_by_role("button", name="创建", exact=True).click()
-            recycled_color = (data_dir / "label" / "回收颜色测试.txt").read_text(encoding="utf-8").splitlines()[0]
+            recycled_path = data_dir / "label" / "回收颜色测试.txt"
+            recycled_deadline = time.monotonic() + 10
+            while time.monotonic() < recycled_deadline and not recycled_path.exists():
+                time.sleep(0.05)
+            assert recycled_path.exists()
+            recycled_color = recycled_path.read_text(encoding="utf-8").splitlines()[0]
             assert recycled_color == second_color
             label_card("回收颜色测试").get_by_role("button", name="删除", exact=True).click()
             expect(label_card("回收颜色测试")).to_have_count(0)
