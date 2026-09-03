@@ -42,3 +42,12 @@ def test_grid_rows_share_the_fixed_viewport_without_scrolling():
     css = (ASSETS / "grid.css").read_text(encoding="utf-8")
     assert "gridTemplateRows = `repeat(${data.rows}, minmax(0, 1fr))`" in javascript
     assert ".sample-grid" in css and "overflow: hidden" in css
+
+
+def test_component_tracks_the_actual_browser_viewport():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    component = (ASSETS.parents[1] / "streamlit_demo" / "component.py").read_text(encoding="utf-8")
+    assert "visualViewport?.height" in javascript
+    assert "root.getBoundingClientRect().top" in javascript
+    assert "addEventListener('resize', fitToViewport)" in javascript
+    assert 'height="content"' in component

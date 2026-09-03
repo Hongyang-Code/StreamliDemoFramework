@@ -30,5 +30,7 @@ def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
         on_show_badges_change=lambda: None,
         on_action_change=lambda: None,
         key=key,
-        height=700,
+        # The component measures its viewport-aware root instead of reserving a
+        # fixed 700 px, so shorter displays do not acquire a page scrollbar.
+        height="content",
     )

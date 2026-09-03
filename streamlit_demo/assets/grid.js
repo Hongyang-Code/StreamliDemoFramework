@@ -19,6 +19,19 @@ export default function(component) {
   const labelRank = new Map((data.label_order || []).map((name, index) => [name, index]));
   root._pendingMemberships ||= new Map();
 
+  // Use exactly the vertical space left below the component. This keeps the
+  // current page and toolbar visible after resizing or moving between screens.
+  const ownerWindow = parentElement.ownerDocument.defaultView || window;
+  const fitToViewport = () => {
+    const viewportHeight = ownerWindow.visualViewport?.height || ownerWindow.innerHeight;
+    const componentTop = root.getBoundingClientRect().top;
+    const available = Math.floor(viewportHeight - componentTop - 10);
+    root.style.height = `${Math.max(260, Math.min(700, available))}px`;
+  };
+  fitToViewport();
+  ownerWindow.addEventListener('resize', fitToViewport);
+  ownerWindow.visualViewport?.addEventListener('resize', fitToViewport);
+
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
     if (className) element.className = className;
@@ -234,5 +247,10 @@ export default function(component) {
   };
   document.addEventListener('click', dismissMenu);
   document.addEventListener('keydown', keyboard);
-  return () => { document.removeEventListener('click', dismissMenu); document.removeEventListener('keydown', keyboard); };
+  return () => {
+    document.removeEventListener('click', dismissMenu);
+    document.removeEventListener('keydown', keyboard);
+    ownerWindow.removeEventListener('resize', fitToViewport);
+    ownerWindow.visualViewport?.removeEventListener('resize', fitToViewport);
+  };
 }

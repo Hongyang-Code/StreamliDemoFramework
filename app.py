@@ -121,21 +121,27 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
         if st.session_state.get("show_create_label_form", False):
             render_create_label_form(store)
 
+        label_card_styles = []
         for name, color in labels.items():
             token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
             selected_css = f"border-color:{color}!important;box-shadow:0 0 0 1px {color}33!important;" if name == active else ""
-            st.markdown(
+            label_card_styles.append(
                 f"""
-                <style>
                 .st-key-label_card_{token} {{ padding:.18rem .28rem!important; margin-bottom:.35rem; {selected_css} }}
                 .st-key-label_card_{token} [data-testid="stVerticalBlock"] {{ gap:.25rem; }}
                 .st-key-select_{token} button {{ border:0!important; background:transparent!important; padding:.22rem .25rem!important; min-height:30px; text-align:left; }}
                 .st-key-select_{token} button p {{ color:{color}!important; font-weight:750!important; }}
                 .st-key-edit_{token} button, .st-key-delete_{token} button {{ padding:.22rem .32rem!important; min-height:30px; font-size:.72rem; }}
-                </style>
                 """,
-                unsafe_allow_html=True,
             )
+
+        # Keep all per-label styling in one zero-height block. Emitting one style
+        # element per label makes Streamlit add a full layout gap before every card.
+        if label_card_styles:
+            st.markdown(f"<style>{''.join(label_card_styles)}</style>", unsafe_allow_html=True)
+
+        for name, color in labels.items():
+            token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
             with st.container(border=True, key=f"label_card_{token}"):
                 name_col, edit_col, delete_col = st.columns([4.2, 2, 2], gap="small", vertical_alignment="center")
                 if name_col.button(
@@ -194,8 +200,14 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
                             except StorageError as exc:
                                 st.error(str(exc))
 
-        st.divider()
-        st.page_link("pages/操作指南.py", label="打开操作指南", icon="📖", use_container_width=True)
+        with st.container(key="sidebar_guide"):
+            st.page_link(
+                "pages/操作指南.py",
+                label="操作指南",
+                icon=":material/info:",
+                help="选择标签后左键样本进行标记；右键可添加单样本备注；A / D 翻页。点击打开完整操作指南。",
+                use_container_width=True,
+            )
 
     active = st.session_state.get("active_label")
     if active and active in labels:
@@ -211,6 +223,12 @@ def main(config: AppConfig) -> None:
         .block-container { max-width: 100%; padding-top: 2.35rem; padding-bottom: .5rem; }
         [data-testid="stSidebar"] { border-right: 1px solid rgba(148,163,184,.25); }
         [data-testid="stSidebarNav"] { display:none; }
+        [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] { min-height:calc(100dvh - 134px); }
+        [data-testid="stSidebar"] [class*="st-key-label_card_"] { margin-bottom:-.45rem!important; }
+        [data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-sidebar_guide) { margin-top:auto!important; }
+        [data-testid="stSidebar"] .st-key-sidebar_guide { padding-top:.25rem; }
+        [data-testid="stSidebar"] .st-key-sidebar_guide a { min-height:34px; border:0; color:#64748b; justify-content:flex-start; padding:.3rem .35rem; }
+        [data-testid="stSidebar"] .st-key-sidebar_guide a:hover { color:var(--text-color); background:rgba(148,163,184,.10); }
         .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 1.35rem 0 4px auto;
           border: 1px solid rgba(148,163,184,.35); border-radius: 999px; background: rgba(255,255,255,.92);
           box-shadow: 0 6px 22px rgba(15,23,42,.08); backdrop-filter: blur(10px); cursor: default; }

@@ -97,6 +97,23 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             page.get_by_role("button", name="创建", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二", timeout=30_000)
 
+            label_boxes = page.locator('[class*="st-key-label_card_"]').evaluate_all(
+                "cards => cards.map(card => ({top: card.getBoundingClientRect().top, bottom: card.getBoundingClientRect().bottom}))"
+            )
+            assert label_boxes[1]["top"] - label_boxes[0]["bottom"] <= 12
+            guide = page.locator(".st-key-sidebar_guide")
+            guide_box = guide.evaluate(
+                "element => ({bottom: element.getBoundingClientRect().bottom, viewport: window.innerHeight})"
+            )
+            assert guide_box["viewport"] - guide_box["bottom"] <= 40
+            guide.get_by_test_id("stTooltipHoverTarget").hover()
+            expect(
+                page.get_by_text(
+                    "选择标签后左键样本进行标记；右键可添加单样本备注；A / D 翻页。点击打开完整操作指南。",
+                    exact=True,
+                )
+            ).to_be_visible()
+
             first = page.locator(".sample-card").first
             first.click()
             second_label_path = data_dir / "label" / "样例标签二.txt"
@@ -210,11 +227,26 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(page_input).to_have_value("2", timeout=10_000)
             expect(page.locator(".sample-card")).to_have_count(2)
 
+            page.set_viewport_size({"width": 1280, "height": 650})
+            page.wait_for_timeout(300)
+            responsive_main = page.locator('[data-testid="stMain"]').evaluate(
+                "main => ({clientHeight: main.clientHeight, scrollHeight: main.scrollHeight})"
+            )
+            responsive_grid = page.locator(".sample-app").evaluate(
+                "grid => ({bottom: grid.getBoundingClientRect().bottom, viewport: window.innerHeight})"
+            )
+            assert responsive_main["scrollHeight"] <= responsive_main["clientHeight"] + 1
+            assert responsive_grid["bottom"] <= responsive_grid["viewport"]
+            page.set_viewport_size({"width": 1440, "height": 1000})
+            page.wait_for_timeout(300)
+
             renamed_card = label_card("样例标签二已修改")
             renamed_card.get_by_role("button", name="删除", exact=True).click()
             expect(renamed_card).to_have_count(0)
 
-            page.get_by_role("link", name="打开操作指南", exact=True).click()
+            page.locator(".st-key-sidebar_guide").get_by_test_id("stTooltipHoverTarget").get_by_test_id(
+                "stPageLink-NavLink"
+            ).click()
             expect(page.get_by_text("📖 操作指南", exact=True)).to_be_visible(timeout=20_000)
             page.get_by_role("tab", name="标签与标记", exact=True).click()
             expect(page.get_by_text("角标和外框可以混合使用", exact=True)).to_be_visible()

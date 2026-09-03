@@ -1,6 +1,6 @@
 :host { color: var(--st-text-color); font-family: var(--st-font); }
 * { box-sizing: border-box; }
-.sample-app { position: relative; height: 700px; max-height: 700px; min-height: 0; padding: 2px; display: flex; flex-direction: column; overflow: hidden; }
+.sample-app { position: relative; height: 700px; min-height: 260px; padding: 2px; display: flex; flex-direction: column; overflow: hidden; }
 .sample-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; align-items: stretch; align-content: stretch; overflow: hidden; padding: 2px 3px 8px; }
 .sample-card {
   position: relative; min-width: 0; overflow: hidden; border: 1px solid color-mix(in srgb, var(--st-text-color) 14%, transparent);
@@ -60,4 +60,4 @@ button.danger { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
 .history-entry { padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; white-space: pre-wrap; }
 .history-entry time { display: block; margin-bottom: 4px; color: #64748b; }
 .empty-state { padding: 80px 20px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 14px; }
-@media (max-width: 700px) { .sample-grid { grid-template-columns: 1fr !important; } .toolbar { position: static; } }
+@media (max-width: 700px) { .toolbar { gap: 5px; padding: 5px 7px; } }
