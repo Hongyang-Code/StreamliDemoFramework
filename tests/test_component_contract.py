@@ -59,6 +59,16 @@ def test_component_tracks_the_actual_browser_viewport():
     assert 'height="content"' in component
 
 
+def test_search_input_is_persistent_for_real_ime_composition():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    html = (ASSETS / "grid.html").read_text(encoding="utf-8")
+    assert 'class="search-input"' in html
+    assert "toolbarBefore.replaceChildren()" in javascript
+    assert "toolbarAfter.replaceChildren()" in javascript
+    assert "toolbar.replaceChildren()" not in javascript
+    assert "event.composedPath?.()[0]" in javascript
+
+
 def test_label_manager_supports_long_press_reordering_and_editing():
     javascript = (ASSETS / "label_manager.js").read_text(encoding="utf-8")
     for contract in (

@@ -24,6 +24,7 @@
 .frame-rings { position:absolute; inset:0; z-index:5; border-radius:13px; pointer-events:none; }
 .note-indicator { position: absolute; left: 8px; bottom: 39px; padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,.9); font-size: 12px; }
 .toolbar { flex: 0 0 auto; z-index: 10; margin-top: 8px; min-height: 50px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(148,163,184,.35); border-radius: 12px; background: color-mix(in srgb, var(--st-background-color) 96%, transparent); box-shadow: 0 -3px 18px rgba(15,23,42,.08); backdrop-filter: blur(10px); }
+.toolbar-segment { display: contents; }
 .toolbar label { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
 .active-label { font-size: 12px; font-weight: 700; }
 .toolbar-search { position: relative; width: min(230px, 26vw); min-width: 150px; }

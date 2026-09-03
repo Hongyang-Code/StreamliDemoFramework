@@ -1,7 +1,15 @@
 <div class="sample-app">
   <div class="sample-grid" data-role="grid"></div>
   <div class="empty-state" data-role="empty" hidden>当前目录没有匹配此模态的文件。</div>
-  <div class="toolbar" data-role="toolbar"></div>
+  <div class="toolbar" data-role="toolbar">
+    <div class="toolbar-segment" data-role="toolbar-before"></div>
+    <div class="toolbar-search">
+      <input class="search-input" type="search" placeholder="检索文件名" autocomplete="off"
+        aria-label="检索文件名" role="combobox" aria-autocomplete="list">
+      <div class="search-suggestions" data-role="search-suggestions" role="listbox" hidden></div>
+    </div>
+    <div class="toolbar-segment" data-role="toolbar-after"></div>
+  </div>
   <div class="context-menu" data-role="context" hidden>
     <button type="button" data-role="open-viewer">🔍 单独查看</button>
     <button type="button" data-role="open-note">📝 单个样本备注</button>

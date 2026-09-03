@@ -4,6 +4,11 @@ export default function(component) {
   const grid = root.querySelector('[data-role="grid"]');
   const empty = root.querySelector('[data-role="empty"]');
   const toolbar = root.querySelector('[data-role="toolbar"]');
+  const toolbarBefore = root.querySelector('[data-role="toolbar-before"]');
+  const toolbarAfter = root.querySelector('[data-role="toolbar-after"]');
+  const searchWrap = root.querySelector('.toolbar-search');
+  const searchInput = root.querySelector('.search-input');
+  const suggestions = root.querySelector('[data-role="search-suggestions"]');
   const menu = root.querySelector('[data-role="context"]');
   const dialog = root.querySelector('[data-role="note-dialog"]');
   const viewer = root.querySelector('[data-role="viewer-dialog"]');
@@ -214,26 +219,17 @@ export default function(component) {
     showViewerSample(target.edge === 'first' ? 0 : viewerSamples.length - 1);
   }
 
-  const searchHadFocus = root._searchFocused === true;
-  toolbar.replaceChildren();
+  toolbarBefore.replaceChildren();
+  toolbarAfter.replaceChildren();
   const activeStatus = make('span', 'active-label', data.active_label ? `当前标签：${data.active_label.name}` : '当前标签：未选择');
   if (data.active_label) activeStatus.style.color = data.active_label.color;
-  toolbar.appendChild(activeStatus);
-  root._searchInput ??= data.search_query || '';
+  toolbarBefore.appendChild(activeStatus);
+  if (root._searchInput === undefined) {
+    root._searchInput = data.search_query || '';
+    searchInput.value = root._searchInput;
+  }
   root._searchSelection ??= -1;
   root._searchComposing ??= false;
-  const searchWrap = make('div', 'toolbar-search');
-  const searchInput = make('input', 'search-input');
-  root._searchInputElement = searchInput;
-  searchInput.type = 'search';
-  searchInput.placeholder = '检索文件名';
-  searchInput.value = root._searchInput;
-  searchInput.autocomplete = 'off';
-  searchInput.setAttribute('aria-label', '检索文件名');
-  searchInput.setAttribute('role', 'combobox');
-  searchInput.setAttribute('aria-autocomplete', 'list');
-  const suggestions = make('div', 'search-suggestions');
-  suggestions.setAttribute('role', 'listbox');
   const resultNames = () => root._searchInput === (data.search_query || '') ? (data.search_results || []) : [];
   const navigateSearch = name => {
     const query = root._searchInput.trim();
@@ -272,9 +268,7 @@ export default function(component) {
   };
   searchInput.onfocus = () => { root._searchFocused = true; renderSuggestions(); };
   searchInput.onblur = () => setTimeout(() => {
-    // A component update replaces the toolbar input. Ignore the delayed blur
-    // from that retired node; the newly rendered input owns focus state now.
-    if (root._searchInputElement !== searchInput) return;
+    if (searchWrap.contains(searchInput.getRootNode().activeElement)) return;
     root._searchFocused = false;
     suggestions.hidden = true;
   }, 0);
@@ -333,15 +327,7 @@ export default function(component) {
       suggestions.hidden = true;
     }
   };
-  searchWrap.append(searchInput, suggestions);
-  toolbar.appendChild(searchWrap);
   renderSuggestions();
-  if (searchHadFocus) requestAnimationFrame(() => {
-    root._searchFocused = true;
-    searchInput.focus();
-    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-    renderSuggestions();
-  });
   const numberInput = (labelText, value, min, max, callback) => {
     const label = make('label', '', labelText);
     const input = make('input'); input.type = 'number'; input.min = min; input.value = value;
@@ -351,26 +337,26 @@ export default function(component) {
       if (max !== null) nextValue = Math.min(max, nextValue);
       callback(nextValue);
     });
-    label.appendChild(input); toolbar.appendChild(label);
+    label.appendChild(input); toolbarAfter.appendChild(label);
   };
   numberInput('行', data.rows, 1, null, value => setStateValue('rows', value));
   numberInput('列', data.cols, 1, null, value => setStateValue('cols', value));
   const previous = make('button', '', '← 上一页'); previous.disabled = data.page <= 1;
-  previous.onclick = () => setStateValue('page', data.page - 1); toolbar.appendChild(previous);
+  previous.onclick = () => setStateValue('page', data.page - 1); toolbarAfter.appendChild(previous);
   numberInput('页码', data.page, 1, Math.max(1, data.total_pages), value => setStateValue('page', value));
-  toolbar.appendChild(make('span', '', `/ ${data.total_pages || 0} 页 · ${data.total_count} 个样本`));
+  toolbarAfter.appendChild(make('span', '', `/ ${data.total_pages || 0} 页 · ${data.total_count} 个样本`));
   const next = make('button', '', '下一页 →'); next.disabled = data.page >= data.total_pages;
-  next.onclick = () => setStateValue('page', data.page + 1); toolbar.appendChild(next);
+  next.onclick = () => setStateValue('page', data.page + 1); toolbarAfter.appendChild(next);
   const badgeLabel = make('label', '', '显示标记');
   const checkbox = make('input'); checkbox.type = 'checkbox'; checkbox.checked = data.show_badges;
-  checkbox.onchange = () => setStateValue('show_badges', checkbox.checked); badgeLabel.prepend(checkbox); toolbar.appendChild(badgeLabel);
+  checkbox.onchange = () => setStateValue('show_badges', checkbox.checked); badgeLabel.prepend(checkbox); toolbarAfter.appendChild(badgeLabel);
   const refresh = make('button', 'refresh-button', '↻ 刷新');
   refresh.title = '重新扫描输入目录；刷新后保持当前页';
   refresh.onclick = () => {
     refresh.disabled = true;
     setTriggerValue('action', {type: 'refresh', op_id: opId()});
   };
-  toolbar.appendChild(refresh);
+  toolbarAfter.appendChild(refresh);
 
   root.querySelector('[data-role="open-viewer"]').onclick = () => { menu.hidden = true; if (contextSample) openViewer(contextSample); };
   root.querySelector('[data-role="open-note"]').onclick = () => { menu.hidden = true; if (contextSample) openNote(contextSample); };
@@ -412,8 +398,9 @@ export default function(component) {
       if (event.key === 'ArrowRight') { event.preventDefault(); navigateViewer(1); }
       return;
     }
-    const tag = event.target.tagName;
-    if (['INPUT', 'TEXTAREA', 'SELECT', 'VIDEO'].includes(tag) || event.target.isContentEditable) return;
+    const keyTarget = event.composedPath?.()[0] || event.target;
+    const tag = keyTarget.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'VIDEO'].includes(tag) || keyTarget.isContentEditable) return;
     if ((event.key === 'a' || event.key === 'A') && data.page > 1) setStateValue('page', data.page - 1);
     if ((event.key === 'd' || event.key === 'D') && data.page < data.total_pages) setStateValue('page', data.page + 1);
   };
