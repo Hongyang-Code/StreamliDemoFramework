@@ -6,6 +6,7 @@ ASSETS = Path(__file__).parents[1] / "streamlit_demo" / "assets"
 
 def test_component_contains_required_interactions():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    search_html = (ASSETS / "search_frame.html").read_text(encoding="utf-8")
     for contract in (
         "contextmenu",
         "setTriggerValue('action'",
@@ -20,13 +21,10 @@ def test_component_contains_required_interactions():
         "orderedLabels",
         "frame-rings",
         "search_navigate",
-        "search-suggestions",
-        "ArrowDown",
-        "oncompositionstart",
-        "oncompositionend",
-        "event.isComposing",
     ):
         assert contract in javascript
+    for contract in ("ArrowDown", "oncompositionstart", "oncompositionend", "event.isComposing"):
+        assert contract in search_html
 
 
 def test_component_uses_safe_text_rendering():
@@ -62,7 +60,11 @@ def test_component_tracks_the_actual_browser_viewport():
 def test_search_input_is_persistent_for_real_ime_composition():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
     html = (ASSETS / "grid.html").read_text(encoding="utf-8")
-    assert 'class="search-input"' in html
+    search_html = (ASSETS / "search_frame.html").read_text(encoding="utf-8")
+    assert 'class="search-frame"' in html
+    assert 'aria-label="检索文件名"' in search_html
+    assert "__filenameSearchHost" in javascript
+    assert "__filenameSearch" in search_html
     assert "toolbarBefore.replaceChildren()" in javascript
     assert "toolbarAfter.replaceChildren()" in javascript
     assert "toolbar.replaceChildren()" not in javascript

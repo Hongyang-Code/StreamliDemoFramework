@@ -1,3 +1,5 @@
+const SEARCH_FRAME_DOCUMENT = __SEARCH_FRAME_DOCUMENT__;
+
 export default function(component) {
   const { data, parentElement, setStateValue, setTriggerValue } = component;
   const root = parentElement.querySelector('.sample-app');
@@ -6,9 +8,7 @@ export default function(component) {
   const toolbar = root.querySelector('[data-role="toolbar"]');
   const toolbarBefore = root.querySelector('[data-role="toolbar-before"]');
   const toolbarAfter = root.querySelector('[data-role="toolbar-after"]');
-  const searchWrap = root.querySelector('.toolbar-search');
-  const searchInput = root.querySelector('.search-input');
-  const suggestions = root.querySelector('[data-role="search-suggestions"]');
+  const searchFrame = root.querySelector('.search-frame');
   const menu = root.querySelector('[data-role="context"]');
   const dialog = root.querySelector('[data-role="note-dialog"]');
   const viewer = root.querySelector('[data-role="viewer-dialog"]');
@@ -224,110 +224,33 @@ export default function(component) {
   const activeStatus = make('span', 'active-label', data.active_label ? `当前标签：${data.active_label.name}` : '当前标签：未选择');
   if (data.active_label) activeStatus.style.color = data.active_label.color;
   toolbarBefore.appendChild(activeStatus);
-  if (root._searchInput === undefined) {
-    root._searchInput = data.search_query || '';
-    searchInput.value = root._searchInput;
+  const sendSearchState = () => searchFrame.contentWindow?.postMessage({
+    __filenameSearchHost: true,
+    query: data.search_query || '',
+    results: data.search_results || [],
+  }, '*');
+  const searchMessage = event => {
+    if (event.source !== searchFrame.contentWindow || !event.data?.__filenameSearch) return;
+    const message = event.data;
+    if (message.type === 'ready') {
+      sendSearchState();
+    } else if (message.type === 'height') {
+      searchFrame.style.height = `${Math.max(31, Math.min(276, Number(message.height) || 31))}px`;
+    } else if (message.type === 'query') {
+      setTriggerValue('action', {type: 'search', op_id: opId(), query: String(message.query || '')});
+    } else if (message.type === 'navigate') {
+      setTriggerValue('action', {
+        type: 'search_navigate', op_id: opId(), query: String(message.query || ''), sample: String(message.sample || ''),
+      });
+    }
+  };
+  ownerWindow.addEventListener('message', searchMessage);
+  if (!searchFrame.srcdoc) {
+    searchFrame.onload = sendSearchState;
+    searchFrame.srcdoc = SEARCH_FRAME_DOCUMENT;
+  } else {
+    sendSearchState();
   }
-  root._searchSelection ??= -1;
-  root._searchComposing ??= false;
-  const resultNames = () => root._searchInput === (data.search_query || '') ? (data.search_results || []) : [];
-  const navigateSearch = name => {
-    const query = root._searchInput.trim();
-    if (!query) return;
-    suggestions.hidden = true;
-    setTriggerValue('action', {type: 'search_navigate', op_id: opId(), query, sample: name || ''});
-  };
-  const renderSuggestions = () => {
-    const query = root._searchInput.trim();
-    suggestions.replaceChildren();
-    if (!root._searchFocused || !query) { suggestions.hidden = true; return; }
-    if (root._searchInput !== (data.search_query || '')) {
-      suggestions.appendChild(make('div', 'search-message', '正在查找…'));
-      suggestions.hidden = false;
-      return;
-    }
-    const names = resultNames();
-    if (!names.length) {
-      suggestions.appendChild(make('div', 'search-message', '没有匹配的文件名'));
-      suggestions.hidden = false;
-      return;
-    }
-    root._searchSelection = Math.min(root._searchSelection, names.length - 1);
-    names.forEach((name, index) => {
-      const option = make('button', 'search-option', name);
-      option.type = 'button';
-      option.title = name;
-      option.setAttribute('role', 'option');
-      option.setAttribute('aria-selected', index === root._searchSelection ? 'true' : 'false');
-      if (index === root._searchSelection) option.classList.add('selected');
-      option.onmousedown = event => event.preventDefault();
-      option.onclick = event => { event.stopPropagation(); navigateSearch(name); };
-      suggestions.appendChild(option);
-    });
-    suggestions.hidden = false;
-  };
-  searchInput.onfocus = () => { root._searchFocused = true; renderSuggestions(); };
-  searchInput.onblur = () => setTimeout(() => {
-    if (searchWrap.contains(searchInput.getRootNode().activeElement)) return;
-    root._searchFocused = false;
-    suggestions.hidden = true;
-  }, 0);
-  const scheduleSearch = (delay = 80) => {
-    clearTimeout(root._searchTimer);
-    const query = root._searchInput;
-    root._searchTimer = setTimeout(() => {
-      if (root._searchComposing || root._searchInput !== query) return;
-      setTriggerValue('action', {type: 'search', op_id: opId(), query});
-    }, delay);
-  };
-  searchInput.oncompositionstart = () => {
-    root._searchComposing = true;
-    clearTimeout(root._searchTimer);
-    suggestions.replaceChildren();
-    suggestions.hidden = true;
-  };
-  searchInput.oncompositionend = () => {
-    root._searchComposing = false;
-    root._searchInput = searchInput.value;
-    root._searchSelection = -1;
-    renderSuggestions();
-    scheduleSearch(0);
-  };
-  searchInput.oninput = event => {
-    root._searchInput = searchInput.value;
-    root._searchSelection = -1;
-    if (event.isComposing || root._searchComposing) {
-      clearTimeout(root._searchTimer);
-      suggestions.replaceChildren();
-      suggestions.hidden = true;
-      return;
-    }
-    renderSuggestions();
-    scheduleSearch();
-  };
-  searchInput.onkeydown = event => {
-    // Enter and arrow keys belong to the IME while Chinese/Japanese/Korean
-    // text is being composed. Search only after compositionend.
-    if (event.isComposing || root._searchComposing || event.keyCode === 229) return;
-    const names = resultNames();
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault(); event.stopPropagation();
-      if (names.length) {
-        const direction = event.key === 'ArrowDown' ? 1 : -1;
-        if (root._searchSelection < 0) root._searchSelection = direction > 0 ? 0 : names.length - 1;
-        else root._searchSelection = (root._searchSelection + direction + names.length) % names.length;
-        renderSuggestions();
-      }
-    } else if (event.key === 'Enter') {
-      event.preventDefault(); event.stopPropagation();
-      const selected = names[root._searchSelection] || names[0] || '';
-      clearTimeout(root._searchTimer);
-      navigateSearch(selected);
-    } else if (event.key === 'Escape') {
-      suggestions.hidden = true;
-    }
-  };
-  renderSuggestions();
   const numberInput = (labelText, value, min, max, callback) => {
     const label = make('label', '', labelText);
     const input = make('input'); input.type = 'number'; input.min = min; input.value = value;
@@ -407,7 +330,7 @@ export default function(component) {
   document.addEventListener('click', dismissMenu);
   document.addEventListener('keydown', keyboard);
   return () => {
-    clearTimeout(root._searchTimer);
+    ownerWindow.removeEventListener('message', searchMessage);
     document.removeEventListener('click', dismissMenu);
     document.removeEventListener('keydown', keyboard);
     ownerWindow.removeEventListener('resize', fitToViewport);
