@@ -12,6 +12,7 @@ if [[ ! -x "${python_bin}" ]]; then python_bin="python"; fi
 "${python_bin}" -m streamlit run "${project_root}/app.py" \
   --server.address 0.0.0.0 \
   --server.port 10082 \
+  --server.fileWatcherType none \
   -- \
   --mode video \
   --title "视频实验结果展示与标注" \

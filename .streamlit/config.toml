@@ -2,6 +2,9 @@
 headless = true
 enableWebsocketCompression = true
 maxMessageSize = 160
+# Demo servers do not need source-code hot reload. Disabling the watcher also
+# avoids exhausting the host-wide Linux inotify quota on shared servers.
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false

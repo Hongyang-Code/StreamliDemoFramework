@@ -58,12 +58,15 @@ bash /data4/lhy/project/StramlitDemoFramework/demo_scripts/my_image_demo.sh
 - `examples/demo_scripts/video_demo.sh`：视频样例，默认端口 10082。
 - `examples/demo_scripts/text_demo.sh`：文本样例，默认端口 10083。
 
+三个模板均关闭了仅用于源码热重载的文件监听，避免共享服务器出现 `inotify watch limit reached`。这不会影响底栏“刷新”扫描新增或删除的样本；只有修改项目代码后需要手动重启启动脚本。
+
 也可以直接启动自己的数据：
 
 ```bash
 python -m streamlit run app.py \
   --server.address 0.0.0.0 \
   --server.port 10081 \
+  --server.fileWatcherType none \
   -- \
   --mode image \
   --title "我的实验结果" \
@@ -71,6 +74,8 @@ python -m streamlit run app.py \
 ```
 
 注意：Streamlit 参数必须写在 `--` 前，应用参数必须写在 `--` 后。
+
+如果终端曾出现 `OSError: [Errno 28] inotify watch limit reached`，请停止旧进程并用更新后的脚本重新启动。项目已经通过 `--server.fileWatcherType none` 绕开服务器的监听额度限制，不需要修改系统内核参数。
 
 ## 应用参数
 
