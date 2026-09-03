@@ -221,6 +221,7 @@ export default function(component) {
   toolbar.appendChild(activeStatus);
   root._searchInput ??= data.search_query || '';
   root._searchSelection ??= -1;
+  root._searchComposing ??= false;
   const searchWrap = make('div', 'toolbar-search');
   const searchInput = make('input', 'search-input');
   root._searchInputElement = searchInput;
@@ -277,16 +278,43 @@ export default function(component) {
     root._searchFocused = false;
     suggestions.hidden = true;
   }, 0);
-  searchInput.oninput = () => {
+  const scheduleSearch = (delay = 80) => {
+    clearTimeout(root._searchTimer);
+    const query = root._searchInput;
+    root._searchTimer = setTimeout(() => {
+      if (root._searchComposing || root._searchInput !== query) return;
+      setTriggerValue('action', {type: 'search', op_id: opId(), query});
+    }, delay);
+  };
+  searchInput.oncompositionstart = () => {
+    root._searchComposing = true;
+    clearTimeout(root._searchTimer);
+    suggestions.replaceChildren();
+    suggestions.hidden = true;
+  };
+  searchInput.oncompositionend = () => {
+    root._searchComposing = false;
     root._searchInput = searchInput.value;
     root._searchSelection = -1;
     renderSuggestions();
-    clearTimeout(root._searchTimer);
-    root._searchTimer = setTimeout(() => {
-      setTriggerValue('action', {type: 'search', op_id: opId(), query: root._searchInput});
-    }, 80);
+    scheduleSearch(0);
+  };
+  searchInput.oninput = event => {
+    root._searchInput = searchInput.value;
+    root._searchSelection = -1;
+    if (event.isComposing || root._searchComposing) {
+      clearTimeout(root._searchTimer);
+      suggestions.replaceChildren();
+      suggestions.hidden = true;
+      return;
+    }
+    renderSuggestions();
+    scheduleSearch();
   };
   searchInput.onkeydown = event => {
+    // Enter and arrow keys belong to the IME while Chinese/Japanese/Korean
+    // text is being composed. Search only after compositionend.
+    if (event.isComposing || root._searchComposing || event.keyCode === 229) return;
     const names = resultNames();
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault(); event.stopPropagation();

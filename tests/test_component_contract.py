@@ -22,6 +22,9 @@ def test_component_contains_required_interactions():
         "search_navigate",
         "search-suggestions",
         "ArrowDown",
+        "oncompositionstart",
+        "oncompositionend",
+        "event.isComposing",
     ):
         assert contract in javascript
 

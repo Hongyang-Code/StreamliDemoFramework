@@ -296,6 +296,31 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             assert "grid_marks=0" in page.url
 
             search = page.get_by_role("combobox", name="检索文件名")
+            search.focus()
+            search.evaluate(
+                """input => {
+                    input.dispatchEvent(new CompositionEvent('compositionstart', {data: '', bubbles: true}));
+                    input.value = '样例图片_05';
+                    input.dispatchEvent(new InputEvent('input', {
+                        data: '样例图片_05', inputType: 'insertCompositionText', isComposing: true, bubbles: true,
+                    }));
+                }"""
+            )
+            page.wait_for_timeout(250)
+            expect(search).to_have_value("样例图片_05")
+            expect(page.locator(".search-option")).to_have_count(0)
+            search.press("Enter")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
+            search.evaluate(
+                "input => input.dispatchEvent(new CompositionEvent('compositionend', "
+                "{data: '样例图片_05', bubbles: true}))"
+            )
+            expect(page.locator(".search-option")).to_have_count(1, timeout=10_000)
+            expect(page.locator(".search-option").first).to_be_visible()
+            search.press("Enter")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("4", timeout=30_000)
+            expect(page.locator('.sample-card[data-sample="样例图片_05.png"]')).to_be_visible()
+
             search.fill("彩色测试图")
             expect(page.locator(".search-option")).to_have_count(1, timeout=10_000)
             expect(page.locator(".search-option").first).to_be_visible()
