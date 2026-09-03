@@ -298,12 +298,14 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             search = page.get_by_role("combobox", name="检索文件名")
             search.fill("彩色测试图")
             expect(page.locator(".search-option")).to_have_count(1, timeout=10_000)
+            expect(page.locator(".search-option").first).to_be_visible()
             search.press("Enter")
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("1", timeout=30_000)
             expect(page.locator('.sample-card[data-sample="彩色测试图.jpg"]')).to_be_visible()
             search.fill("样例图片_2")
             suggestions = page.locator(".search-option")
             expect(suggestions).to_have_count(8, timeout=10_000)
+            expect(suggestions.first).to_be_visible()
             search.press("ArrowDown")
             expect(page.locator(".search-option.selected")).to_have_text("样例图片_20.png")
             search.press("ArrowDown")
@@ -354,7 +356,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
 
             page.locator(".st-key-sidebar_guide").get_by_test_id("stTooltipHoverTarget").get_by_test_id(
                 "stPageLink-NavLink"
-            ).click()
+            ).first.click()
             expect(page.get_by_text("📖 操作指南", exact=True)).to_be_visible(timeout=20_000)
             page.get_by_role("tab", name="标签与标记", exact=True).click()
             expect(page.get_by_text("角标和外框可以混合使用", exact=True)).to_be_visible()

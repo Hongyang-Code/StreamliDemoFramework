@@ -223,6 +223,7 @@ export default function(component) {
   root._searchSelection ??= -1;
   const searchWrap = make('div', 'toolbar-search');
   const searchInput = make('input', 'search-input');
+  root._searchInputElement = searchInput;
   searchInput.type = 'search';
   searchInput.placeholder = '检索文件名';
   searchInput.value = root._searchInput;
@@ -270,11 +271,11 @@ export default function(component) {
   };
   searchInput.onfocus = () => { root._searchFocused = true; renderSuggestions(); };
   searchInput.onblur = () => setTimeout(() => {
-    const currentSearch = root.querySelector('.toolbar-search');
-    if (!currentSearch?.contains(document.activeElement)) {
-      root._searchFocused = false;
-      root.querySelector('.search-suggestions')?.setAttribute('hidden', '');
-    }
+    // A component update replaces the toolbar input. Ignore the delayed blur
+    // from that retired node; the newly rendered input owns focus state now.
+    if (root._searchInputElement !== searchInput) return;
+    root._searchFocused = false;
+    suggestions.hidden = true;
   }, 0);
   searchInput.oninput = () => {
     root._searchInput = searchInput.value;
@@ -283,7 +284,7 @@ export default function(component) {
     clearTimeout(root._searchTimer);
     root._searchTimer = setTimeout(() => {
       setTriggerValue('action', {type: 'search', op_id: opId(), query: root._searchInput});
-    }, 160);
+    }, 80);
   };
   searchInput.onkeydown = event => {
     const names = resultNames();
