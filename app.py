@@ -17,6 +17,12 @@ from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, 
 MODE_LABELS = {"image": "图片", "video": "视频", "text": "文本"}
 DEFAULT_LAYOUTS = {"image": (2, 3), "video": (1, 2), "text": (2, 2)}
 GRID_VIEW_KEYS = ("rows", "cols", "page", "show_badges")
+GRID_QUERY_KEYS = {
+    "rows": "grid_rows",
+    "cols": "grid_cols",
+    "page": "grid_page",
+    "show_badges": "grid_marks",
+}
 
 
 @st.cache_resource(show_spinner=False)
@@ -55,7 +61,30 @@ def remember_grid_view(state) -> None:
 
 
 def grid_view_value(key: str, default):
-    return st.session_state.get(f"grid_view_{key}", default)
+    session_key = f"grid_view_{key}"
+    if session_key in st.session_state:
+        return st.session_state[session_key]
+    query_value = st.query_params.get(GRID_QUERY_KEYS[key])
+    if query_value is None:
+        return default
+    if key == "show_badges":
+        return str(query_value).casefold() not in {"0", "false", "off", "no"}
+    try:
+        return max(1, int(query_value))
+    except (TypeError, ValueError):
+        return default
+
+
+def sync_grid_view_query(rows: int, cols: int, page: int, show_badges: bool) -> None:
+    values = {
+        "grid_rows": str(rows),
+        "grid_cols": str(cols),
+        "grid_page": str(page),
+        "grid_marks": "1" if show_badges else "0",
+    }
+    for key, value in values.items():
+        if st.query_params.get(key) != value:
+            st.query_params[key] = value
 
 
 def render_create_label_form(store: LabelStore) -> None:
@@ -64,17 +93,22 @@ def render_create_label_form(store: LabelStore) -> None:
     default_color = next_palette_color(store.list_labels().values())
     with st.container(border=True):
         st.caption("新建标签")
-        with st.form("create_label_form", clear_on_submit=True):
+        with st.form("create_label_form", clear_on_submit=True, enter_to_submit=True):
+            # Streamlit submits the first form button on Enter. This invisible
+            # primary submit keeps keyboard behavior independent of the visual
+            # Cancel/Create column order below.
+            with st.container(key="enter_create_submit"):
+                enter_create = st.form_submit_button("回车创建标签")
             new_name = st.text_input("标签名称")
             new_color = st.color_picker("标签颜色", default_color, key="new_label_color")
             cancel_col, create_col = st.columns(2)
-            cancel = cancel_col.form_submit_button("取消", use_container_width=True)
             create = create_col.form_submit_button("创建", type="primary", use_container_width=True)
+            cancel = cancel_col.form_submit_button("取消", use_container_width=True)
     if cancel:
         st.session_state["show_create_label_form"] = False
         st.session_state["reset_new_label_color"] = True
         st.rerun()
-    if create:
+    if create or enter_create:
         try:
             store.create_label(new_name, new_color)
             st.session_state["pending_active_label"] = new_name.strip()
@@ -236,6 +270,7 @@ def main(config: AppConfig) -> None:
         [data-testid="stSidebar"] .st-key-sidebar_guide { padding-top:.25rem; }
         [data-testid="stSidebar"] .st-key-sidebar_guide a { min-height:34px; border:0; color:#64748b; justify-content:flex-start; padding:.3rem .35rem; }
         [data-testid="stSidebar"] .st-key-sidebar_guide a:hover { color:var(--text-color); background:rgba(148,163,184,.10); }
+        .st-key-enter_create_submit { display:none!important; }
         .status-float { position: relative; z-index: 30; width: fit-content; min-width: 210px; margin: 1.35rem 0 4px auto;
           border: 1px solid rgba(148,163,184,.35); border-radius: 999px; background: rgba(255,255,255,.92);
           box-shadow: 0 6px 22px rgba(15,23,42,.08); backdrop-filter: blur(10px); cursor: default; }
@@ -290,6 +325,7 @@ def main(config: AppConfig) -> None:
     st.session_state["grid_view_cols"] = cols
     st.session_state["grid_view_page"] = page
     st.session_state["grid_view_show_badges"] = show_badges
+    sync_grid_view_query(rows, cols, page, show_badges)
     entries = dataset.page(page, per_page)
 
     manager = get_preview_manager(str(config.data_dir), config.preview_cache_mb)

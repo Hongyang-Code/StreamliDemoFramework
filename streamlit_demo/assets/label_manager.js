@@ -57,10 +57,16 @@ export default function(component) {
     styleLabel.appendChild(styleSelect);
     const editorGrid = make('div', 'editor-grid'); editorGrid.append(colorLabel, styleLabel);
     const save = make('button', 'save', '保存设置'); save.type = 'button';
-    save.onclick = event => {
-      event.stopPropagation();
+    const submitUpdate = () => {
       root._editing = null; editor.hidden = true;
       emit({type: 'update', name: label.name, new_name: nameInput.value, color: colorInput.value, style: styleSelect.value});
+    };
+    save.onclick = event => { event.stopPropagation(); submitUpdate(); };
+    editor.onkeydown = event => {
+      if (event.key !== 'Enter' || event.isComposing || event.repeat) return;
+      event.preventDefault();
+      event.stopPropagation();
+      submitUpdate();
     };
     editor.append(nameLabel, editorGrid, save); card.appendChild(editor);
 

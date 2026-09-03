@@ -93,7 +93,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
 
             page.get_by_role("button", name="＋ 新建标签", exact=True).click()
             page.get_by_label("标签名称").fill("样例标签一")
-            page.get_by_role("button", name="创建", exact=True).click()
+            page.get_by_label("标签名称").press("Enter")
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签一", timeout=30_000)
             first_color = (data_dir / "label" / "样例标签一.txt").read_text(encoding="utf-8").splitlines()[0]
 
@@ -186,7 +186,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             second_card = label_card("样例标签二")
             second_card.get_by_role("button", name="编辑", exact=True).click()
             second_card.get_by_label("新名称").fill("样例标签二已修改")
-            second_card.get_by_role("button", name="保存设置", exact=True).click()
+            second_card.get_by_label("新名称").press("Enter")
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二已修改", timeout=10_000)
 
             rapid = page.locator(".sample-card").evaluate_all(
@@ -282,6 +282,17 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             page.get_by_role("button", name="↻ 刷新", exact=True).click()
             expect(page_input).to_have_value("2", timeout=10_000)
             expect(page.locator(".sample-card")).to_have_count(2)
+
+            page.reload(wait_until="networkidle")
+            expect(page.locator(".toolbar label", has_text="行").locator("input")).to_have_value("2", timeout=30_000)
+            expect(page.locator(".toolbar label", has_text="列").locator("input")).to_have_value("1")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
+            expect(page.locator(".toolbar label", has_text="显示标记").locator("input")).not_to_be_checked()
+            expect(page.locator(".sample-card")).to_have_count(2)
+            assert "grid_rows=2" in page.url
+            assert "grid_cols=1" in page.url
+            assert "grid_page=2" in page.url
+            assert "grid_marks=0" in page.url
 
             page.set_viewport_size({"width": 1280, "height": 650})
             page.wait_for_timeout(300)
