@@ -58,6 +58,7 @@ with overview_tab:
     st.subheader("3. 翻页与布局")
     st.markdown(
         "底栏可以修改行数、列数和页码。行列数不设上限，修改后网格、当前页切片和总页数立即重算。"
+        "当前页中的所有行会自动等分固定展示高度，因此不需要上下滚动才能看完这一页。"
         "输入框和视频控件未聚焦时，可以按 <kbd>A</kbd> 上一页、<kbd>D</kbd> 下一页。",
         unsafe_allow_html=True,
     )

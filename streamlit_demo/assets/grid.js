@@ -115,7 +115,9 @@ export default function(component) {
 
   grid.replaceChildren();
   grid.style.gridTemplateColumns = `repeat(${data.cols}, minmax(120px, 1fr))`;
-  grid.style.gridAutoRows = `${Math.max(190, Math.min(370, 700 / Math.max(1, data.rows)))}px`;
+  grid.style.rowGap = `${Math.min(10, 80 / Math.max(1, data.rows))}px`;
+  grid.style.gridTemplateRows = `repeat(${data.rows}, minmax(0, 1fr))`;
+  grid.style.gridAutoRows = 'minmax(0, 1fr)';
   empty.hidden = data.samples.length > 0;
   data.samples.forEach(sample => {
     const card = make('article', 'sample-card');

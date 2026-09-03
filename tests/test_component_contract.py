@@ -35,3 +35,10 @@ def test_row_and_column_inputs_have_no_maximum():
     assert "data.rows, 1, null" in javascript
     assert "data.cols, 1, null" in javascript
     assert "min(8" not in app
+
+
+def test_grid_rows_share_the_fixed_viewport_without_scrolling():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    css = (ASSETS / "grid.css").read_text(encoding="utf-8")
+    assert "gridTemplateRows = `repeat(${data.rows}, minmax(0, 1fr))`" in javascript
+    assert ".sample-grid" in css and "overflow: hidden" in css

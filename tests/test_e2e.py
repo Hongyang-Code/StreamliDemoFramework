@@ -185,6 +185,14 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             rows.press("Tab")
             expect(rows).to_have_value("12", timeout=10_000)
             expect(page.locator(".sample-card")).to_have_count(30)
+            grid_size = page.locator(".sample-grid").evaluate(
+                "grid => ({clientHeight: grid.clientHeight, scrollHeight: grid.scrollHeight})"
+            )
+            assert grid_size["scrollHeight"] <= grid_size["clientHeight"] + 1
+            main_size = page.locator('[data-testid="stMain"]').evaluate(
+                "main => ({clientHeight: main.clientHeight, scrollHeight: main.scrollHeight})"
+            )
+            assert main_size["scrollHeight"] <= main_size["clientHeight"] + 1
             rows.fill("2")
             rows.press("Tab")
             expect(page.locator(".toolbar label", has_text="行").locator("input")).to_have_value("2", timeout=10_000)

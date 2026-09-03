@@ -30,5 +30,5 @@ def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
         on_show_badges_change=lambda: None,
         on_action_change=lambda: None,
         key=key,
-        height=780,
+        height=700,
     )
