@@ -67,3 +67,20 @@ class DatasetIndex:
             raise ValueError("per_page must be positive")
         start = max(0, page - 1) * per_page
         return self.entries[start : start + per_page]
+
+    def search(self, query: str, limit: int = 8) -> tuple[str, ...]:
+        """Return a bounded filename-only substring search result."""
+        needle = query.strip().casefold()
+        if not needle or limit < 1:
+            return ()
+        matches: list[str] = []
+        for entry in self.entries:
+            if needle in entry.name.casefold():
+                matches.append(entry.name)
+                if len(matches) >= limit:
+                    break
+        return tuple(matches)
+
+    def position(self, name: str) -> int | None:
+        """Locate one exact filename without maintaining another large map."""
+        return next((index for index, entry in enumerate(self.entries) if entry.name == name), None)

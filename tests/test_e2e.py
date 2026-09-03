@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import hashlib
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -293,6 +294,29 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             assert "grid_cols=1" in page.url
             assert "grid_page=2" in page.url
             assert "grid_marks=0" in page.url
+
+            search = page.get_by_role("combobox", name="检索文件名")
+            search.fill("彩色测试图")
+            expect(page.locator(".search-option")).to_have_count(1, timeout=10_000)
+            search.press("Enter")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("1", timeout=30_000)
+            expect(page.locator('.sample-card[data-sample="彩色测试图.jpg"]')).to_be_visible()
+            search.fill("样例图片_2")
+            suggestions = page.locator(".search-option")
+            expect(suggestions).to_have_count(8, timeout=10_000)
+            search.press("ArrowDown")
+            expect(page.locator(".search-option.selected")).to_have_text("样例图片_20.png")
+            search.press("ArrowDown")
+            expect(page.locator(".search-option.selected")).to_have_text("样例图片_21.png")
+            search.press("Enter")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("12", timeout=30_000)
+            expect(page.locator('.sample-card[data-sample="样例图片_21.png"]')).to_have_class(
+                re.compile(r"\bsearch-target\b")
+            )
+            expect(page.locator('.sample-card[data-sample="样例图片_21.png"]')).to_be_visible()
+            page.locator(".toolbar label", has_text="页码").locator("input").fill("2")
+            page.locator(".toolbar label", has_text="页码").locator("input").press("Tab")
+            expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2", timeout=10_000)
 
             page.set_viewport_size({"width": 1280, "height": 650})
             page.wait_for_timeout(300)

@@ -133,7 +133,30 @@ def handle_component_action(state, store: LabelStore, dataset: DatasetIndex) -> 
     try:
         if action.get("type") == "refresh":
             dataset.refresh()
+            query = str(st.session_state.get("search_query", ""))
+            st.session_state["search_results"] = list(dataset.search(query))
             st.toast("文件列表已刷新，当前页保持不变", icon="🔄")
+        elif action.get("type") == "search":
+            query = str(action.get("query", "")).strip()
+            st.session_state["search_query"] = query
+            st.session_state["search_results"] = list(dataset.search(query))
+            st.session_state.pop("search_target", None)
+        elif action.get("type") == "search_navigate":
+            query = str(action.get("query", "")).strip()
+            requested = str(action.get("sample", ""))
+            target = requested if requested in dataset.names and query.casefold() in requested.casefold() else ""
+            if not target:
+                matches = dataset.search(query, limit=1)
+                target = matches[0] if matches else ""
+            st.session_state["search_query"] = query
+            st.session_state["search_results"] = list(dataset.search(query))
+            if target:
+                position = dataset.position(target)
+                rows = max(1, int(st.session_state.get("grid_view_rows", 1)))
+                cols = max(1, int(st.session_state.get("grid_view_cols", 1)))
+                if position is not None:
+                    st.session_state["grid_view_page"] = position // (rows * cols) + 1
+                    st.session_state["search_target"] = target
         elif action.get("type") == "membership":
             store.set_membership(
                 str(action.get("label", "")),
@@ -377,6 +400,9 @@ def main(config: AppConfig) -> None:
             "show_badges": show_badges,
             "active_label": active_label,
             "label_order": list(store.list_labels()),
+            "search_query": st.session_state.get("search_query", ""),
+            "search_results": st.session_state.get("search_results", []),
+            "search_target": st.session_state.get("search_target", ""),
         },
     )
 

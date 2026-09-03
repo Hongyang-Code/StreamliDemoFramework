@@ -166,6 +166,7 @@ export default function(component) {
   data.samples.forEach(sample => {
     const card = make('article', 'sample-card');
     card.dataset.sample = sample.name;
+    if (sample.name === data.search_target) card.classList.add('search-target');
     const media = make('div', 'media');
     if (sample.error) {
       media.appendChild(make('div', 'error', sample.error));
@@ -213,10 +214,105 @@ export default function(component) {
     showViewerSample(target.edge === 'first' ? 0 : viewerSamples.length - 1);
   }
 
+  const searchHadFocus = root._searchFocused === true;
   toolbar.replaceChildren();
   const activeStatus = make('span', 'active-label', data.active_label ? `当前标签：${data.active_label.name}` : '当前标签：未选择');
   if (data.active_label) activeStatus.style.color = data.active_label.color;
   toolbar.appendChild(activeStatus);
+  root._searchInput ??= data.search_query || '';
+  root._searchSelection ??= -1;
+  const searchWrap = make('div', 'toolbar-search');
+  const searchInput = make('input', 'search-input');
+  searchInput.type = 'search';
+  searchInput.placeholder = '检索文件名';
+  searchInput.value = root._searchInput;
+  searchInput.autocomplete = 'off';
+  searchInput.setAttribute('aria-label', '检索文件名');
+  searchInput.setAttribute('role', 'combobox');
+  searchInput.setAttribute('aria-autocomplete', 'list');
+  const suggestions = make('div', 'search-suggestions');
+  suggestions.setAttribute('role', 'listbox');
+  const resultNames = () => root._searchInput === (data.search_query || '') ? (data.search_results || []) : [];
+  const navigateSearch = name => {
+    const query = root._searchInput.trim();
+    if (!query) return;
+    suggestions.hidden = true;
+    setTriggerValue('action', {type: 'search_navigate', op_id: opId(), query, sample: name || ''});
+  };
+  const renderSuggestions = () => {
+    const query = root._searchInput.trim();
+    suggestions.replaceChildren();
+    if (!root._searchFocused || !query) { suggestions.hidden = true; return; }
+    if (root._searchInput !== (data.search_query || '')) {
+      suggestions.appendChild(make('div', 'search-message', '正在查找…'));
+      suggestions.hidden = false;
+      return;
+    }
+    const names = resultNames();
+    if (!names.length) {
+      suggestions.appendChild(make('div', 'search-message', '没有匹配的文件名'));
+      suggestions.hidden = false;
+      return;
+    }
+    root._searchSelection = Math.min(root._searchSelection, names.length - 1);
+    names.forEach((name, index) => {
+      const option = make('button', 'search-option', name);
+      option.type = 'button';
+      option.title = name;
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', index === root._searchSelection ? 'true' : 'false');
+      if (index === root._searchSelection) option.classList.add('selected');
+      option.onmousedown = event => event.preventDefault();
+      option.onclick = event => { event.stopPropagation(); navigateSearch(name); };
+      suggestions.appendChild(option);
+    });
+    suggestions.hidden = false;
+  };
+  searchInput.onfocus = () => { root._searchFocused = true; renderSuggestions(); };
+  searchInput.onblur = () => setTimeout(() => {
+    const currentSearch = root.querySelector('.toolbar-search');
+    if (!currentSearch?.contains(document.activeElement)) {
+      root._searchFocused = false;
+      root.querySelector('.search-suggestions')?.setAttribute('hidden', '');
+    }
+  }, 0);
+  searchInput.oninput = () => {
+    root._searchInput = searchInput.value;
+    root._searchSelection = -1;
+    renderSuggestions();
+    clearTimeout(root._searchTimer);
+    root._searchTimer = setTimeout(() => {
+      setTriggerValue('action', {type: 'search', op_id: opId(), query: root._searchInput});
+    }, 160);
+  };
+  searchInput.onkeydown = event => {
+    const names = resultNames();
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); event.stopPropagation();
+      if (names.length) {
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        if (root._searchSelection < 0) root._searchSelection = direction > 0 ? 0 : names.length - 1;
+        else root._searchSelection = (root._searchSelection + direction + names.length) % names.length;
+        renderSuggestions();
+      }
+    } else if (event.key === 'Enter') {
+      event.preventDefault(); event.stopPropagation();
+      const selected = names[root._searchSelection] || names[0] || '';
+      clearTimeout(root._searchTimer);
+      navigateSearch(selected);
+    } else if (event.key === 'Escape') {
+      suggestions.hidden = true;
+    }
+  };
+  searchWrap.append(searchInput, suggestions);
+  toolbar.appendChild(searchWrap);
+  renderSuggestions();
+  if (searchHadFocus) requestAnimationFrame(() => {
+    root._searchFocused = true;
+    searchInput.focus();
+    searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    renderSuggestions();
+  });
   const numberInput = (labelText, value, min, max, callback) => {
     const label = make('label', '', labelText);
     const input = make('input'); input.type = 'number'; input.min = min; input.value = value;
@@ -295,6 +391,7 @@ export default function(component) {
   document.addEventListener('click', dismissMenu);
   document.addEventListener('keydown', keyboard);
   return () => {
+    clearTimeout(root._searchTimer);
     document.removeEventListener('click', dismissMenu);
     document.removeEventListener('keydown', keyboard);
     ownerWindow.removeEventListener('resize', fitToViewport);

@@ -64,6 +64,13 @@ with overview_tab:
         unsafe_allow_html=True,
     )
 
+    st.subheader("4. 按文件名检索")
+    st.markdown(
+        "在底栏的“检索文件名”中输入完整文件名或其中一段，候选列表会显示当前数据中最多 8 个匹配文件。"
+        "按上下方向键移动选中项，再按 Enter 跳到它所在的页面；也可以直接点击候选文件名。"
+        "如果没有用方向键选择，按 Enter 会跳到第一条匹配结果。跳转后目标卡片会短暂高亮。"
+    )
+
 with labels_tab:
     st.subheader("标签卡片怎么使用")
     st.markdown(

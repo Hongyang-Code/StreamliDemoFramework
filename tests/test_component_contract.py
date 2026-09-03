@@ -19,6 +19,9 @@ def test_component_contains_required_interactions():
         "membership_batch",
         "orderedLabels",
         "frame-rings",
+        "search_navigate",
+        "search-suggestions",
+        "ArrowDown",
     ):
         assert contract in javascript
 

@@ -20,6 +20,11 @@ def test_index_is_flat_filtered_sorted_and_supports_symlinks(tmp_path: Path):
     assert [entry.name for entry in index.entries] == ["a.png", "b.JPG", "linked.jpeg"]
     assert [entry.name for entry in index.page(2, 2)] == ["linked.jpeg"]
     assert "hidden.jpg" not in index.names
+    assert index.search(".J") == ("b.JPG", "linked.jpeg")
+    assert index.search("a", limit=1) == ("a.png",)
+    assert index.search("") == ()
+    assert index.position("linked.jpeg") == 2
+    assert index.position("missing.jpg") is None
 
 
 def test_text_extensions(tmp_path: Path):
@@ -40,7 +45,9 @@ def test_hundred_thousand_entry_pagination_stays_bounded(tmp_path: Path):
     index._names = frozenset()
     rss_before_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     pages = [index.page(page, 24) for page in range(1, 101)]
+    matches = index.search("sample_0")
     rss_after_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     assert all(len(page) == 24 for page in pages)
     assert sum(len(page) for page in pages) == 2_400
+    assert len(matches) == 8
     assert rss_after_kb - rss_before_kb < 100 * 1024
