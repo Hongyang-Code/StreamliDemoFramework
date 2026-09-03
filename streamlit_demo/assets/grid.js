@@ -126,10 +126,28 @@ export default function(component) {
     viewerScale = 1; viewerX = 0; viewerY = 0;
     root.querySelector('[data-role="viewer-filename"]').textContent = sample.name;
     viewerImage.src = sample.source;
-    root.querySelector('[data-role="viewer-position"]').textContent = `${index + 1} / ${viewerSamples.length}`;
-    root.querySelector('[data-role="viewer-previous"]').disabled = index <= 0;
-    root.querySelector('[data-role="viewer-next"]').disabled = index >= viewerSamples.length - 1;
+    root.querySelector('[data-role="viewer-position"]').textContent = `${sample.global_index + 1} / ${data.total_count}`;
+    root.querySelector('[data-role="viewer-previous"]').disabled = sample.global_index <= 0;
+    root.querySelector('[data-role="viewer-next"]').disabled = sample.global_index >= data.total_count - 1;
+    root._viewerPageLoading = false;
     updateViewer();
+  }
+
+  function navigateViewer(direction) {
+    if (root._viewerPageLoading) return;
+    const nextIndex = viewerIndex + direction;
+    if (nextIndex >= 0 && nextIndex < viewerSamples.length) {
+      showViewerSample(nextIndex);
+      return;
+    }
+    const nextPage = data.page + (direction > 0 ? 1 : -1);
+    if (nextPage < 1 || nextPage > data.total_pages) return;
+    root._viewerPageLoading = true;
+    root._viewerPageTarget = {page: nextPage, edge: direction > 0 ? 'first' : 'last'};
+    root.querySelector('[data-role="viewer-previous"]').disabled = true;
+    root.querySelector('[data-role="viewer-next"]').disabled = true;
+    root.querySelector('[data-role="viewer-position"]').textContent = '正在加载…';
+    setStateValue('page', nextPage);
   }
 
   function openViewer(sample) {
@@ -189,6 +207,12 @@ export default function(component) {
     grid.appendChild(card);
   });
 
+  if (viewer.open && root._viewerPageTarget?.page === data.page && viewerSamples.length) {
+    const target = root._viewerPageTarget;
+    root._viewerPageTarget = null;
+    showViewerSample(target.edge === 'first' ? 0 : viewerSamples.length - 1);
+  }
+
   toolbar.replaceChildren();
   const activeStatus = make('span', 'active-label', data.active_label ? `当前标签：${data.active_label.name}` : '当前标签：未选择');
   if (data.active_label) activeStatus.style.color = data.active_label.color;
@@ -225,12 +249,14 @@ export default function(component) {
 
   root.querySelector('[data-role="open-viewer"]').onclick = () => { menu.hidden = true; if (contextSample) openViewer(contextSample); };
   root.querySelector('[data-role="open-note"]').onclick = () => { menu.hidden = true; if (contextSample) openNote(contextSample); };
-  root.querySelector('[data-role="close-viewer"]').onclick = () => viewer.close();
+  root.querySelector('[data-role="close-viewer"]').onclick = () => {
+    root._viewerPageTarget = null; root._viewerPageLoading = false; viewer.close();
+  };
   root.querySelector('[data-role="zoom-in"]').onclick = () => setViewerScale(viewerScale * 1.25);
   root.querySelector('[data-role="zoom-out"]').onclick = () => setViewerScale(viewerScale / 1.25);
   root.querySelector('[data-role="zoom-reset"]').onclick = () => { viewerScale = 1; viewerX = 0; viewerY = 0; updateViewer(); };
-  root.querySelector('[data-role="viewer-previous"]').onclick = () => showViewerSample(viewerIndex - 1);
-  root.querySelector('[data-role="viewer-next"]').onclick = () => showViewerSample(viewerIndex + 1);
+  root.querySelector('[data-role="viewer-previous"]').onclick = () => navigateViewer(-1);
+  root.querySelector('[data-role="viewer-next"]').onclick = () => navigateViewer(1);
   viewerCanvas.onwheel = event => { event.preventDefault(); setViewerScale(viewerScale * (event.deltaY < 0 ? 1.12 : 0.89)); };
   viewerCanvas.onpointerdown = event => {
     if (event.target.closest('button')) return;
@@ -257,8 +283,8 @@ export default function(component) {
   const keyboard = event => {
     if (dialog.open || event.ctrlKey || event.metaKey || event.altKey) return;
     if (viewer.open) {
-      if (event.key === 'ArrowLeft') { event.preventDefault(); showViewerSample(viewerIndex - 1); }
-      if (event.key === 'ArrowRight') { event.preventDefault(); showViewerSample(viewerIndex + 1); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); navigateViewer(-1); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); navigateViewer(1); }
       return;
     }
     const tag = event.target.tagName;

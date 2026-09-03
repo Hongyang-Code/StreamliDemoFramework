@@ -310,10 +310,12 @@ def main(config: AppConfig) -> None:
         st.error(str(exc))
 
     samples = []
-    for entry, preview in zip(entries, previews):
+    page_start = (page - 1) * per_page
+    for page_offset, (entry, preview) in enumerate(zip(entries, previews)):
         samples.append(
             {
                 "name": entry.name,
+                "global_index": page_start + page_offset,
                 "kind": preview.kind,
                 "source": preview.source,
                 "notice": preview.notice,

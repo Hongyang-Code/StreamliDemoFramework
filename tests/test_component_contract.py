@@ -71,6 +71,8 @@ def test_image_viewer_supports_adjacent_navigation():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
     html = (ASSETS / "grid.html").read_text(encoding="utf-8")
     assert "showViewerSample" in javascript
+    assert "navigateViewer" in javascript
+    assert "_viewerPageTarget" in javascript
     assert "ArrowLeft" in javascript and "ArrowRight" in javascript
     assert 'data-role="viewer-previous"' in html
     assert 'data-role="viewer-next"' in html
