@@ -30,7 +30,7 @@ with top_left:
 with top_right:
     st.page_link("app.py", label="返回标注页面", icon="↩️", use_container_width=True)
 
-st.info("最快上手：选择左侧标签 → 左键样本完成标记 → 右键添加单样本备注 → 上下滚动查看全部样本。")
+st.info("最快上手：选择左侧标签 → 左键样本完成标记 → 右键添加单样本备注 → 使用 A / D 翻页。")
 
 overview_tab, labels_tab, media_tab, data_tab = st.tabs(["快速上手", "标签与标记", "查看与备注", "数据与故障排查"])
 
@@ -55,10 +55,11 @@ with overview_tab:
     if image_path.exists():
         st.image(str(image_path), caption="仓库自带图片样例；实际页面会在卡片下方显示文件名。", width=620)
 
-    st.subheader("3. 单页布局")
+    st.subheader("3. 翻页与布局")
     st.markdown(
-        "所有样本都在同一个连续页面中展示，不再划分页码。底栏可以修改列数且不设上限；"
-        "实际行数会根据样本总数和列数自动计算，通过上下滚动即可查看全部内容。"
+        "底栏可以修改行数、列数和页码。行列数不设上限，修改后网格、当前页切片和总页数立即重算。"
+        "输入框和视频控件未聚焦时，可以按 <kbd>A</kbd> 上一页、<kbd>D</kbd> 下一页。",
+        unsafe_allow_html=True,
     )
 
 with labels_tab:
@@ -127,8 +128,8 @@ with media_tab:
 with data_tab:
     st.subheader("刷新与新增文件")
     st.markdown(
-        "向输入目录一级加入新文件后，点击底栏“刷新”。应用会重新扫描目录，"
-        "并在同一个连续页面中更新全部样本。"
+        "向输入目录一级加入新文件后，点击底栏“刷新”。应用会重新扫描文件并保持当前页；"
+        "只有当前页超过刷新后的总页数时，才调整到最后一个有效页面。"
     )
 
     st.subheader("标签文件")

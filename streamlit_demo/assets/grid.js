@@ -176,45 +176,24 @@ export default function(component) {
     });
     label.appendChild(input); toolbar.appendChild(label);
   };
+  numberInput('行', data.rows, 1, null, value => setStateValue('rows', value));
   numberInput('列', data.cols, 1, null, value => setStateValue('cols', value));
-  toolbar.appendChild(make('span', '', `${data.total_count} 个样本 · 单页全部显示`));
+  const previous = make('button', '', '← 上一页'); previous.disabled = data.page <= 1;
+  previous.onclick = () => setStateValue('page', data.page - 1); toolbar.appendChild(previous);
+  numberInput('页码', data.page, 1, Math.max(1, data.total_pages), value => setStateValue('page', value));
+  toolbar.appendChild(make('span', '', `/ ${data.total_pages || 0} 页 · ${data.total_count} 个样本`));
+  const next = make('button', '', '下一页 →'); next.disabled = data.page >= data.total_pages;
+  next.onclick = () => setStateValue('page', data.page + 1); toolbar.appendChild(next);
   const badgeLabel = make('label', '', '显示标记');
   const checkbox = make('input'); checkbox.type = 'checkbox'; checkbox.checked = data.show_badges;
   checkbox.onchange = () => setStateValue('show_badges', checkbox.checked); badgeLabel.prepend(checkbox); toolbar.appendChild(badgeLabel);
   const refresh = make('button', 'refresh-button', '↻ 刷新');
-  refresh.title = '重新扫描输入目录并更新全部样本';
+  refresh.title = '重新扫描输入目录；刷新后保持当前页';
   refresh.onclick = () => {
     refresh.disabled = true;
     setTriggerValue('action', {type: 'refresh', op_id: opId()});
   };
   toolbar.appendChild(refresh);
-  const componentHost = root.getRootNode().host;
-  let viewportWindow = window;
-  let frameElement = null;
-  let scrollContainer = componentHost?.closest('[data-testid="stMain"]') || document.querySelector('[data-testid="stMain"]');
-  try {
-    if (window.frameElement && window.parent.document) {
-      viewportWindow = window.parent;
-      frameElement = window.frameElement;
-      scrollContainer = window.parent.document.querySelector('[data-testid="stMain"]');
-    }
-  } catch (_) {
-    // Cross-origin embedding falls back to the component viewport.
-  }
-  const positionToolbar = () => {
-    const bounds = root.getBoundingClientRect();
-    const viewportBottom = scrollContainer?.getBoundingClientRect().bottom || viewportWindow.innerHeight;
-    const componentTop = frameElement ? frameElement.getBoundingClientRect().top : bounds.top;
-    const desiredTop = viewportBottom - componentTop - toolbar.offsetHeight - 8;
-    const maximumTop = Math.max(0, root.offsetHeight - toolbar.offsetHeight);
-    toolbar.style.top = `${Math.max(0, Math.min(maximumTop, desiredTop))}px`;
-    toolbar.style.width = `${Math.max(260, bounds.width - 4)}px`;
-  };
-  positionToolbar();
-  const toolbarObserver = new ResizeObserver(positionToolbar);
-  toolbarObserver.observe(root);
-  scrollContainer?.addEventListener('scroll', positionToolbar, {passive: true});
-  viewportWindow.addEventListener('resize', positionToolbar, {passive: true});
 
   root.querySelector('[data-role="open-viewer"]').onclick = () => { menu.hidden = true; if (contextSample) openViewer(contextSample); };
   root.querySelector('[data-role="open-note"]').onclick = () => { menu.hidden = true; if (contextSample) openNote(contextSample); };
@@ -244,11 +223,14 @@ export default function(component) {
     dialog.close(); setTriggerValue('action', {type: 'note', op_id: opId(), sample: contextSample.name, text: ''});
   };
   const dismissMenu = event => { if (!menu.contains(event.target)) menu.hidden = true; };
-  document.addEventListener('click', dismissMenu);
-  return () => {
-    document.removeEventListener('click', dismissMenu);
-    scrollContainer?.removeEventListener('scroll', positionToolbar);
-    viewportWindow.removeEventListener('resize', positionToolbar);
-    toolbarObserver.disconnect();
+  const keyboard = event => {
+    if (dialog.open || viewer.open || event.ctrlKey || event.metaKey || event.altKey) return;
+    const tag = event.target.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'VIDEO'].includes(tag) || event.target.isContentEditable) return;
+    if ((event.key === 'a' || event.key === 'A') && data.page > 1) setStateValue('page', data.page - 1);
+    if ((event.key === 'd' || event.key === 'D') && data.page < data.total_pages) setStateValue('page', data.page + 1);
   };
+  document.addEventListener('click', dismissMenu);
+  document.addEventListener('keydown', keyboard);
+  return () => { document.removeEventListener('click', dismissMenu); document.removeEventListener('keydown', keyboard); };
 }
