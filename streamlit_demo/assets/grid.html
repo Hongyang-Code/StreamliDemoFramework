@@ -3,8 +3,8 @@
   <div class="empty-state" data-role="empty" hidden>当前目录没有匹配此模态的文件。</div>
   <div class="toolbar" data-role="toolbar">
     <div class="toolbar-segment" data-role="toolbar-before"></div>
-    <div class="toolbar-search">
-      <iframe class="search-frame" title="文件名检索"></iframe>
+    <div class="toolbar-search" aria-hidden="true">
+      <div class="search-suggestions" data-role="search-suggestions" role="listbox" hidden></div>
     </div>
     <div class="toolbar-segment" data-role="toolbar-after"></div>
   </div>

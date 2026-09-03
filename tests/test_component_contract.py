@@ -6,7 +6,6 @@ ASSETS = Path(__file__).parents[1] / "streamlit_demo" / "assets"
 
 def test_component_contains_required_interactions():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
-    search_html = (ASSETS / "search_frame.html").read_text(encoding="utf-8")
     for contract in (
         "contextmenu",
         "setTriggerValue('action'",
@@ -21,10 +20,12 @@ def test_component_contains_required_interactions():
         "orderedLabels",
         "frame-rings",
         "search_navigate",
+        "compositionstart",
+        "compositionend",
+        "event.isComposing",
+        "ArrowDown",
     ):
         assert contract in javascript
-    for contract in ("ArrowDown", "oncompositionstart", "oncompositionend", "event.isComposing"):
-        assert contract in search_html
 
 
 def test_component_uses_safe_text_rendering():
@@ -60,15 +61,27 @@ def test_component_tracks_the_actual_browser_viewport():
 def test_search_input_is_persistent_for_real_ime_composition():
     javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
     html = (ASSETS / "grid.html").read_text(encoding="utf-8")
-    search_html = (ASSETS / "search_frame.html").read_text(encoding="utf-8")
-    assert 'class="search-frame"' in html
-    assert 'aria-label="检索文件名"' in search_html
-    assert "__filenameSearchHost" in javascript
-    assert "__filenameSearch" in search_html
+    app = (ASSETS.parents[1] / "app.py").read_text(encoding="utf-8")
+    assert 'data-role="search-suggestions"' in html
+    assert "search-frame" not in html
+    assert ".st-key-native_filename_search" in javascript
+    assert 'key="native_filename_search_value"' in app
+    assert "searchInput.addEventListener('compositionstart'" in javascript
+    assert "searchInput.addEventListener('compositionend'" in javascript
     assert "toolbarBefore.replaceChildren()" in javascript
     assert "toolbarAfter.replaceChildren()" in javascript
     assert "toolbar.replaceChildren()" not in javascript
     assert "event.composedPath?.()[0]" in javascript
+
+
+def test_search_does_not_wrap_or_reserve_an_iframe_layer():
+    css = (ASSETS / "grid.css").read_text(encoding="utf-8")
+    component = (ASSETS.parents[1] / "streamlit_demo" / "component.py").read_text(encoding="utf-8")
+    assert "flex-wrap: nowrap" in css
+    assert ".search-suggestions" in css
+    assert ".search-frame" not in css
+    assert "SEARCH_FRAME_DOCUMENT" not in component
+    assert not (ASSETS / "search_frame.html").exists()
 
 
 def test_label_manager_supports_long_press_reordering_and_editing():

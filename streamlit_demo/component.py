@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import streamlit as st
@@ -17,7 +16,7 @@ sample_grid_component = st.components.v2.component(
     "sample_grid",
     html=_read("grid.html"),
     css=_read("grid.css"),
-    js=_read("grid.js").replace("__SEARCH_FRAME_DOCUMENT__", json.dumps(_read("search_frame.html"))),
+    js=_read("grid.js"),
 )
 
 label_manager_component = st.components.v2.component(
