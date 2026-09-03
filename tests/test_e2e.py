@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 import shutil
 import socket
 import subprocess
@@ -94,11 +95,34 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             page.get_by_label("标签名称").fill("样例标签一")
             page.get_by_role("button", name="创建", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签一", timeout=30_000)
+            first_color = (data_dir / "label" / "样例标签一.txt").read_text(encoding="utf-8").splitlines()[0]
 
             page.get_by_role("button", name="＋ 新建标签", exact=True).click()
             page.get_by_label("标签名称").fill("样例标签二")
             page.get_by_role("button", name="创建", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二", timeout=30_000)
+            second_color = (data_dir / "label" / "样例标签二.txt").read_text(encoding="utf-8").splitlines()[0]
+            assert first_color != second_color
+
+            first_card = label_card("样例标签一")
+            second_card = label_card("样例标签二")
+            source_box = second_card.get_by_role("button", name="样例标签二", exact=True).bounding_box()
+            target_box = first_card.bounding_box()
+            assert source_box and target_box
+            page.mouse.move(source_box["x"] + 15, source_box["y"] + source_box["height"] / 2)
+            page.mouse.down()
+            page.wait_for_timeout(380)
+            page.mouse.move(target_box["x"] + 15, target_box["y"] + 2, steps=5)
+            page.mouse.up()
+            expect(page.locator(".label-card").first).to_have_attribute("data-label", "样例标签二")
+            order_deadline = time.monotonic() + 10
+            while time.monotonic() < order_deadline:
+                order = json.loads((data_dir / "label" / "label_settings.json").read_text(encoding="utf-8"))["order"]
+                if order == ["样例标签二", "样例标签一"]:
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError("dragged label order was not persisted")
 
             label_boxes = page.locator('[class*="st-key-label_card_"]').evaluate_all(
                 "cards => cards.map(card => ({top: card.getBoundingClientRect().top, bottom: card.getBoundingClientRect().bottom}))"
@@ -130,9 +154,9 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
 
             first_card = label_card("样例标签一")
             first_card.get_by_role("button", name="编辑", exact=True).click()
-            first_card.get_by_text("外框", exact=True).click()
+            first_card.get_by_label("标记形式").select_option("border")
             first_card.get_by_role("button", name="保存设置", exact=True).click()
-            expect(first_card.get_by_text("标记形式", exact=True)).to_have_count(0)
+            expect(first_card.get_by_label("标记形式")).to_be_hidden()
             first_card.get_by_role("button", name="样例标签一", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签一", timeout=10_000)
             first = page.locator(".sample-card").first
@@ -149,7 +173,7 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             second_card = label_card("样例标签二")
             second_card.get_by_role("button", name="编辑", exact=True).click()
             second_card.get_by_label("新名称").fill("样例标签二已修改")
-            second_card.get_by_role("button", name="重命名", exact=True).click()
+            second_card.get_by_role("button", name="保存设置", exact=True).click()
             expect(page.locator(".active-label")).to_have_text("当前标签：样例标签二已修改", timeout=10_000)
 
             rapid = page.locator(".sample-card").evaluate_all(
@@ -180,6 +204,11 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(viewer).to_be_visible()
             viewer.get_by_role("button", name="放大").click()
             expect(viewer.locator('[data-role="zoom-value"]')).to_have_text("125%")
+            viewer.get_by_role("button", name="下一张图片").click()
+            expect(viewer.locator('[data-role="viewer-position"]')).to_have_text("2 / 6")
+            expect(viewer.locator('[data-role="zoom-value"]')).to_have_text("100%")
+            page.keyboard.press("ArrowLeft")
+            expect(viewer.locator('[data-role="viewer-position"]')).to_have_text("1 / 6")
             viewer.get_by_role("button", name="关闭").click()
 
             page.locator(".sample-card").first.click(button="right")
@@ -251,6 +280,13 @@ def test_browser_label_note_layout_badges_and_keyboard(tmp_path: Path):
             expect(page.locator(".toolbar label", has_text="页码").locator("input")).to_have_value("2")
             expect(page.locator(".toolbar")).to_contain_text("/ 15 页")
             expect(page.locator(".sample-card")).to_have_count(2)
+            page.get_by_role("button", name="＋ 新建标签", exact=True).click()
+            page.get_by_label("标签名称").fill("回收颜色测试")
+            page.get_by_role("button", name="创建", exact=True).click()
+            recycled_color = (data_dir / "label" / "回收颜色测试.txt").read_text(encoding="utf-8").splitlines()[0]
+            assert recycled_color == second_color
+            label_card("回收颜色测试").get_by_role("button", name="删除", exact=True).click()
+            expect(label_card("回收颜色测试")).to_have_count(0)
 
             page.locator(".st-key-sidebar_guide").get_by_test_id("stTooltipHoverTarget").get_by_test_id(
                 "stPageLink-NavLink"

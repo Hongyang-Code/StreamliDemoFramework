@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import math
 import hashlib
+import math
 import sys
 from pathlib import Path
 
 import streamlit as st
 
-from streamlit_demo.component import render_sample_grid
+from streamlit_demo.component import render_label_manager, render_sample_grid
 from streamlit_demo.config import AppConfig, parse_args
 from streamlit_demo.index import DatasetIndex
 from streamlit_demo.media import PreviewManager
-from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, stable_color
+from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, next_palette_color
 
 
 MODE_LABELS = {"image": "图片", "video": "视频", "text": "文本"}
@@ -59,22 +59,27 @@ def grid_view_value(key: str, default):
 
 
 def render_create_label_form(store: LabelStore) -> None:
+    if st.session_state.pop("reset_new_label_color", False):
+        st.session_state.pop("new_label_color", None)
+    default_color = next_palette_color(store.list_labels().values())
     with st.container(border=True):
         st.caption("新建标签")
         with st.form("create_label_form", clear_on_submit=True):
             new_name = st.text_input("标签名称")
-            new_color = st.color_picker("标签颜色", stable_color(new_name or "新标签"))
+            new_color = st.color_picker("标签颜色", default_color, key="new_label_color")
             cancel_col, create_col = st.columns(2)
             cancel = cancel_col.form_submit_button("取消", use_container_width=True)
             create = create_col.form_submit_button("创建", type="primary", use_container_width=True)
     if cancel:
         st.session_state["show_create_label_form"] = False
+        st.session_state["reset_new_label_color"] = True
         st.rerun()
     if create:
         try:
             store.create_label(new_name, new_color)
             st.session_state["pending_active_label"] = new_name.strip()
             st.session_state["show_create_label_form"] = False
+            st.session_state["reset_new_label_color"] = True
             st.rerun()
         except StorageError as exc:
             st.error(str(exc))
@@ -115,9 +120,53 @@ def handle_component_action(state, store: LabelStore, dataset: DatasetIndex) -> 
         st.session_state["operation_error"] = str(exc)
 
 
+def handle_label_manager_action(state, store: LabelStore) -> None:
+    action = state_value(state, "action", None)
+    if not action:
+        return
+    action = dict(action)
+    op_id = str(action.get("op_id", ""))
+    processed: list[str] = st.session_state.setdefault("processed_label_operation_ids", [])
+    if not op_id or op_id in processed:
+        return
+    processed.append(op_id)
+    del processed[:-100]
+    try:
+        action_type = action.get("type")
+        name = str(action.get("name", ""))
+        if action_type == "select":
+            if name not in store.list_labels():
+                raise StorageError("标签不存在")
+            st.session_state["active_label"] = name
+        elif action_type == "delete":
+            store.delete_label(name)
+            if st.session_state.get("active_label") == name:
+                st.session_state["active_label"] = None
+        elif action_type == "reorder":
+            order = action.get("order", [])
+            if not isinstance(order, list):
+                raise StorageError("标签顺序格式错误")
+            store.set_label_order(order)
+        elif action_type == "update":
+            updated_name = store.update_label(
+                name,
+                str(action.get("new_name", "")),
+                str(action.get("color", "")),
+                str(action.get("style", "")),
+            )
+            if st.session_state.get("active_label") == name:
+                st.session_state["active_label"] = updated_name
+            st.toast("标签设置已保存", icon="✅")
+        else:
+            raise StorageError("未知的标签操作")
+    except StorageError as exc:
+        st.session_state["label_manager_error"] = str(exc)
+
+
 def render_sidebar(store: LabelStore) -> dict[str, str] | None:
     with st.sidebar:
         st.header("标签管理")
+        handle_label_manager_action(st.session_state.get("label_manager"), store)
         labels = store.list_labels()
         label_styles = store.get_label_styles()
         if "pending_active_label" in st.session_state:
@@ -141,84 +190,23 @@ def render_sidebar(store: LabelStore) -> dict[str, str] | None:
         if st.session_state.get("show_create_label_form", False):
             render_create_label_form(store)
 
-        label_card_styles = []
-        for name, color in labels.items():
-            token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
-            selected_css = f"border-color:{color}!important;box-shadow:0 0 0 1px {color}33!important;" if name == active else ""
-            label_card_styles.append(
-                f"""
-                .st-key-label_card_{token} {{ padding:.18rem .28rem!important; margin-bottom:.35rem; {selected_css} }}
-                .st-key-label_card_{token} [data-testid="stVerticalBlock"] {{ gap:.25rem; }}
-                .st-key-select_{token} button {{ border:0!important; background:transparent!important; padding:.22rem .25rem!important; min-height:30px; text-align:left; }}
-                .st-key-select_{token} button p {{ color:{color}!important; font-weight:750!important; }}
-                .st-key-edit_{token} button, .st-key-delete_{token} button {{ padding:.22rem .32rem!important; min-height:30px; font-size:.72rem; }}
-                """,
-            )
-
-        # Keep all per-label styling in one zero-height block. Emitting one style
-        # element per label makes Streamlit add a full layout gap before every card.
-        if label_card_styles:
-            st.markdown(f"<style>{''.join(label_card_styles)}</style>", unsafe_allow_html=True)
-
-        for name, color in labels.items():
-            token = hashlib.sha1(name.encode("utf-8")).hexdigest()[:10]
-            with st.container(border=True, key=f"label_card_{token}"):
-                name_col, edit_col, delete_col = st.columns([4.2, 2, 2], gap="small", vertical_alignment="center")
-                if name_col.button(
-                    f"{'✓  ' if name == active else ''}{name}",
-                    key=f"select_{token}",
-                    use_container_width=True,
-                ):
-                    st.session_state["active_label"] = name
-                    st.rerun()
-                if edit_col.button("编辑", key=f"edit_{token}", use_container_width=True):
-                    st.session_state["editing_label"] = None if st.session_state.get("editing_label") == name else name
-                    st.rerun()
-                if delete_col.button("删除", key=f"delete_{token}", use_container_width=True):
-                    try:
-                        store.delete_label(name)
-                        if name == active:
-                            st.session_state["active_label"] = None
-                        if st.session_state.get("editing_label") == name:
-                            st.session_state["editing_label"] = None
-                        st.rerun()
-                    except StorageError as exc:
-                        st.error(str(exc))
-
-                if st.session_state.get("editing_label") == name:
-                    st.caption("标签设置")
-                    selected_color = st.color_picker("颜色", color, key=f"color_{token}")
-                    selected_style_name = st.radio(
-                        "标记形式",
-                        ["角标", "外框"],
-                        index=0 if label_styles.get(name, "badge") == "badge" else 1,
-                        horizontal=True,
-                        key=f"style_{token}",
-                    )
-                    if st.button("保存设置", key=f"save_settings_{token}", use_container_width=True, type="primary"):
-                        try:
-                            store.set_label_color(name, selected_color)
-                            store.set_label_style(name, "badge" if selected_style_name == "角标" else "border")
-                            st.session_state["editing_label"] = None
-                            st.rerun()
-                        except StorageError as exc:
-                            st.error(str(exc))
-
-                    with st.form(f"rename_form_{token}"):
-                        rename_value = st.text_input("新名称", value=name)
-                        rename = st.form_submit_button("重命名", use_container_width=True)
-                    if rename:
-                        if rename_value.strip() == name:
-                            st.info("请输入一个不同的新名称")
-                        else:
-                            try:
-                                store.rename_label(name, rename_value)
-                                if name == active:
-                                    st.session_state["pending_active_label"] = rename_value.strip()
-                                st.session_state["editing_label"] = None
-                                st.rerun()
-                            except StorageError as exc:
-                                st.error(str(exc))
+        manager_error = st.session_state.pop("label_manager_error", None)
+        if manager_error:
+            st.error(manager_error)
+        render_label_manager(
+            data={
+                "labels": [
+                    {
+                        "name": name,
+                        "color": color,
+                        "style": label_styles.get(name, "badge"),
+                        "token": hashlib.sha1(name.encode("utf-8")).hexdigest()[:10],
+                    }
+                    for name, color in labels.items()
+                ],
+                "active_label": active,
+            }
+        )
 
         with st.container(key="sidebar_guide"):
             st.page_link(
@@ -244,7 +232,6 @@ def main(config: AppConfig) -> None:
         [data-testid="stSidebar"] { border-right: 1px solid rgba(148,163,184,.25); }
         [data-testid="stSidebarNav"] { display:none; }
         [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] { min-height:calc(100dvh - 134px); }
-        [data-testid="stSidebar"] [class*="st-key-label_card_"] { margin-bottom:-.45rem!important; }
         [data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-sidebar_guide) { margin-top:auto!important; }
         [data-testid="stSidebar"] .st-key-sidebar_guide { padding-top:.25rem; }
         [data-testid="stSidebar"] .st-key-sidebar_guide a { min-height:34px; border:0; color:#64748b; justify-content:flex-start; padding:.3rem .35rem; }

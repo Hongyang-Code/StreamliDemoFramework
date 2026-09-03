@@ -51,3 +51,25 @@ def test_component_tracks_the_actual_browser_viewport():
     assert "root.getBoundingClientRect().top" in javascript
     assert "addEventListener('resize', fitToViewport)" in javascript
     assert 'height="content"' in component
+
+
+def test_label_manager_supports_long_press_reordering_and_editing():
+    javascript = (ASSETS / "label_manager.js").read_text(encoding="utf-8")
+    for contract in (
+        "setPointerCapture",
+        "type: 'reorder'",
+        "type: 'select'",
+        "type: 'delete'",
+        "type: 'update'",
+        "320",
+    ):
+        assert contract in javascript
+
+
+def test_image_viewer_supports_adjacent_navigation():
+    javascript = (ASSETS / "grid.js").read_text(encoding="utf-8")
+    html = (ASSETS / "grid.html").read_text(encoding="utf-8")
+    assert "showViewerSample" in javascript
+    assert "ArrowLeft" in javascript and "ArrowRight" in javascript
+    assert 'data-role="viewer-previous"' in html
+    assert 'data-role="viewer-next"' in html

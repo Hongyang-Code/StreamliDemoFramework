@@ -41,9 +41,15 @@ button.danger { color: #b91c1c; border-color: #fecaca; background: #fff1f2; }
 .viewer-canvas { flex: 1 1 auto; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: grab; user-select: none; touch-action: none; background: radial-gradient(circle at center, #1E293B, #080D18); }
 .viewer-canvas.dragging { cursor: grabbing; }
 .viewer-canvas img { max-width: 92%; max-height: 92%; object-fit: contain; transform-origin: center; will-change: transform; pointer-events: none; }
+.viewer-nav { position: absolute; top: 50%; z-index: 3; width: 46px; height: 64px; padding: 0; transform: translateY(-50%); border-color: rgba(255,255,255,.22); color: white; background: rgba(15,23,42,.72); font-size: 38px; line-height: 1; backdrop-filter: blur(4px); }
+.viewer-nav:hover { background: rgba(37,99,235,.85); }
+.viewer-nav:disabled { opacity: .24; }
+.viewer-previous { left: 14px; }
+.viewer-next { right: 14px; }
 .viewer-shell footer { flex: 0 0 54px; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 8px 14px; border-top: 1px solid rgba(148,163,184,.22); }
 .viewer-shell footer button { min-width: 42px; color: white; border-color: rgba(148,163,184,.35); background: rgba(30,41,59,.9); }
 .viewer-shell footer small { margin-left: 10px; color: #94A3B8; }
+.viewer-position { min-width: 58px; color: #CBD5E1; font-size: 12px; text-align: center; }
 .note-dialog { width: min(680px, 92vw); padding: 0; border: 0; border-radius: 16px; color: #172033; box-shadow: 0 25px 80px rgba(15,23,42,.4); }
 .note-dialog::backdrop { background: rgba(15,23,42,.48); backdrop-filter: blur(2px); }
 .note-dialog form { padding: 20px; }

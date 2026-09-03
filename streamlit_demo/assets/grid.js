@@ -13,10 +13,12 @@ export default function(component) {
   let viewerScale = 1;
   let viewerX = 0;
   let viewerY = 0;
+  let viewerIndex = -1;
   let dragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
   const labelRank = new Map((data.label_order || []).map((name, index) => [name, index]));
+  const viewerSamples = (data.samples || []).filter(sample => sample.kind === 'image' && sample.source);
   root._pendingMemberships ||= new Map();
 
   // Use exactly the vertical space left below the component. This keeps the
@@ -116,13 +118,24 @@ export default function(component) {
     updateViewer();
   }
 
-  function openViewer(sample) {
-    if (!sample || sample.kind !== 'image' || !sample.source) return;
+  function showViewerSample(index) {
+    if (index < 0 || index >= viewerSamples.length) return;
+    viewerIndex = index;
+    const sample = viewerSamples[index];
     contextSample = sample;
     viewerScale = 1; viewerX = 0; viewerY = 0;
     root.querySelector('[data-role="viewer-filename"]').textContent = sample.name;
     viewerImage.src = sample.source;
+    root.querySelector('[data-role="viewer-position"]').textContent = `${index + 1} / ${viewerSamples.length}`;
+    root.querySelector('[data-role="viewer-previous"]').disabled = index <= 0;
+    root.querySelector('[data-role="viewer-next"]').disabled = index >= viewerSamples.length - 1;
     updateViewer();
+  }
+
+  function openViewer(sample) {
+    const index = viewerSamples.findIndex(item => item.name === sample?.name);
+    if (index < 0) return;
+    showViewerSample(index);
     viewer.showModal();
   }
 
@@ -216,8 +229,11 @@ export default function(component) {
   root.querySelector('[data-role="zoom-in"]').onclick = () => setViewerScale(viewerScale * 1.25);
   root.querySelector('[data-role="zoom-out"]').onclick = () => setViewerScale(viewerScale / 1.25);
   root.querySelector('[data-role="zoom-reset"]').onclick = () => { viewerScale = 1; viewerX = 0; viewerY = 0; updateViewer(); };
+  root.querySelector('[data-role="viewer-previous"]').onclick = () => showViewerSample(viewerIndex - 1);
+  root.querySelector('[data-role="viewer-next"]').onclick = () => showViewerSample(viewerIndex + 1);
   viewerCanvas.onwheel = event => { event.preventDefault(); setViewerScale(viewerScale * (event.deltaY < 0 ? 1.12 : 0.89)); };
   viewerCanvas.onpointerdown = event => {
+    if (event.target.closest('button')) return;
     dragging = true; dragStartX = event.clientX - viewerX; dragStartY = event.clientY - viewerY;
     viewerCanvas.classList.add('dragging'); viewerCanvas.setPointerCapture(event.pointerId);
   };
@@ -239,7 +255,12 @@ export default function(component) {
   };
   const dismissMenu = event => { if (!menu.contains(event.target)) menu.hidden = true; };
   const keyboard = event => {
-    if (dialog.open || viewer.open || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (dialog.open || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (viewer.open) {
+      if (event.key === 'ArrowLeft') { event.preventDefault(); showViewerSample(viewerIndex - 1); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); showViewerSample(viewerIndex + 1); }
+      return;
+    }
     const tag = event.target.tagName;
     if (['INPUT', 'TEXTAREA', 'SELECT', 'VIDEO'].includes(tag) || event.target.isContentEditable) return;
     if ((event.key === 'a' || event.key === 'A') && data.page > 1) setStateValue('page', data.page - 1);

@@ -1,0 +1,18 @@
+:host { color: var(--st-text-color); font-family: var(--st-font); }
+* { box-sizing: border-box; }
+.label-manager { display: flex; flex-direction: column; gap: 7px; padding: 1px 0; }
+.label-card { position: relative; border: 1px solid color-mix(in srgb, var(--st-text-color) 18%, transparent); border-radius: 9px; background: var(--st-background-color); transition: border-color .12s, box-shadow .12s, transform .12s; touch-action: pan-y; }
+.label-card.active { border-color: var(--label-color); box-shadow: 0 0 0 1px color-mix(in srgb, var(--label-color) 28%, transparent); }
+.label-card.drag-ready { z-index: 5; transform: scale(1.015); box-shadow: 0 9px 24px rgba(15,23,42,.18); cursor: grabbing; }
+.label-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 5px; align-items: center; min-height: 38px; padding: 3px; cursor: grab; }
+.label-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; padding: 6px 7px; text-align: left; color: var(--label-color); background: transparent; font-weight: 750; }
+button { min-height: 30px; padding: 4px 9px; border: 1px solid color-mix(in srgb, var(--st-text-color) 20%, transparent); border-radius: 8px; color: var(--st-text-color); background: var(--st-background-color); cursor: pointer; }
+button:hover { border-color: var(--st-primary-color); }
+.editor { display: grid; gap: 8px; padding: 8px; border-top: 1px solid color-mix(in srgb, var(--st-text-color) 12%, transparent); }
+.editor[hidden] { display: none; }
+.editor label { display: grid; gap: 4px; color: color-mix(in srgb, var(--st-text-color) 72%, transparent); font-size: 12px; }
+.editor input[type="text"], .editor select { width: 100%; min-height: 34px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--st-text-color) 20%, transparent); border-radius: 8px; color: var(--st-text-color); background: var(--st-background-color); }
+.editor input[type="color"] { width: 100%; height: 34px; padding: 2px; border: 1px solid color-mix(in srgb, var(--st-text-color) 20%, transparent); border-radius: 8px; background: var(--st-background-color); }
+.editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.save { color: white; border-color: var(--st-primary-color); background: var(--st-primary-color); }
+.drag-hint { margin: 1px 3px 0; color: color-mix(in srgb, var(--st-text-color) 55%, transparent); font-size: 10px; }

@@ -17,6 +17,14 @@ from typing import Iterable
 COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 RESERVED_LABELS = {"sample_notes", "label_settings", ".label_index", ".store"}
+LABEL_COLOR_PALETTE = (
+    "#FF4F87", "#7C4DFF", "#00C2FF", "#26D7AE", "#FFD23F", "#FF7A45",
+    "#E84AD2", "#536DFE", "#00B8A9", "#8ED63F", "#FFB000", "#FF5A5F",
+    "#C44DFF", "#3388FF", "#00C9A7", "#B7D52A", "#FF8F3D", "#F43F5E",
+    "#A855F7", "#06A8E8", "#14B8A6", "#65C466", "#F6C445", "#F973A8",
+    "#8B5CF6", "#3B82F6", "#22D3C5", "#84CC5A", "#F59E42", "#EC4899",
+    "#D946EF", "#0EA5E9", "#10B981", "#A3D43F", "#FBBF24", "#FB7185",
+)
 
 
 class StorageError(RuntimeError):
@@ -34,6 +42,15 @@ def stable_color(name: str) -> str:
     lightness = 0.48 + digest[3] / 255 * 0.12
     red, green, blue = colorsys.hls_to_rgb(hue, lightness, saturation)
     return f"#{round(red * 255):02X}{round(green * 255):02X}{round(blue * 255):02X}"
+
+
+def next_palette_color(used_colors: Iterable[str]) -> str:
+    used = {color.upper() for color in used_colors if COLOR_RE.fullmatch(str(color))}
+    for color in LABEL_COLOR_PALETTE:
+        if color not in used:
+            return color
+    # More simultaneous labels than palette entries: keep deterministic variety.
+    return stable_color(f"palette-overflow-{len(used)}")
 
 
 def validate_label_name(name: str) -> str:
@@ -196,11 +213,16 @@ class LabelStore:
     def list_labels(self) -> dict[str, str]:
         self.refresh_index()
         with self._connect() as connection:
-            return dict(connection.execute("SELECT name, color FROM labels ORDER BY name COLLATE NOCASE"))
+            labels = dict(connection.execute("SELECT name, color FROM labels ORDER BY name COLLATE NOCASE"))
+        with self._lock():
+            order = self._load_label_settings()["order"]
+        ordered_names = [name for name in order if name in labels]
+        ordered_names.extend(name for name in labels if name not in ordered_names)
+        return {name: labels[name] for name in ordered_names}
 
     @staticmethod
     def _empty_label_settings() -> dict:
-        return {"version": 1, "labels": {}}
+        return {"version": 1, "order": [], "labels": {}}
 
     def _load_label_settings(self) -> dict:
         if not self.settings_path.exists():
@@ -211,6 +233,10 @@ class LabelStore:
             raise StorageError("label_settings.json 已损坏，请修复或备份后再修改标签设置") from exc
         if value.get("version") != 1 or not isinstance(value.get("labels"), dict):
             raise StorageError("label_settings.json 结构不受支持或缺少 version/labels")
+        if "order" not in value:
+            value["order"] = []
+        if not isinstance(value["order"], list) or not all(isinstance(name, str) for name in value["order"]):
+            raise StorageError("label_settings.json 的 order 必须是标签名列表")
         return value
 
     def get_label_styles(self) -> dict[str, str]:
@@ -265,7 +291,13 @@ class LabelStore:
             path = self.label_dir / f"{name}.txt"
             if path.exists():
                 raise StorageError("标签已存在")
+            settings = self._load_label_settings()
+            existing = [item.stem for item in self._label_paths()]
+            settings["order"] = [item for item in settings["order"] if item in existing]
+            settings["order"].extend(item for item in existing if item not in settings["order"])
             self._write_label(path, color, ())
+            settings["order"].append(name)
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
         self.refresh_index(force=True)
 
     def rename_label(self, old_name: str, new_name: str) -> None:
@@ -279,10 +311,14 @@ class LabelStore:
             if new_path.exists():
                 raise StorageError("新标签名已存在")
             settings = self._load_label_settings()
+            existing = [item.stem for item in self._label_paths()]
+            settings["order"] = [item for item in settings["order"] if item in existing]
+            settings["order"].extend(item for item in existing if item not in settings["order"])
             os.replace(old_path, new_path)
             if old_name in settings["labels"]:
                 settings["labels"][new_name] = settings["labels"].pop(old_name)
-                _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
+            settings["order"] = [new_name if item == old_name else item for item in settings["order"]]
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
         self.refresh_index(force=True)
 
     def delete_label(self, name: str) -> None:
@@ -292,10 +328,56 @@ class LabelStore:
             if not path.exists():
                 raise StorageError("标签不存在")
             settings = self._load_label_settings()
+            existing = [item.stem for item in self._label_paths()]
+            settings["order"] = [item for item in settings["order"] if item in existing]
+            settings["order"].extend(item for item in existing if item not in settings["order"])
             path.unlink()
-            if settings["labels"].pop(name, None) is not None:
-                _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
+            settings["labels"].pop(name, None)
+            settings["order"] = [item for item in settings["order"] if item != name]
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
         self.refresh_index(force=True)
+
+    def set_label_order(self, order: Iterable[str]) -> None:
+        requested = [validate_label_name(str(name)) for name in order]
+        labels = self.list_labels()
+        if len(requested) != len(set(requested)) or set(requested) != set(labels):
+            raise StorageError("标签顺序必须恰好包含当前全部标签")
+        with self._lock():
+            settings = self._load_label_settings()
+            settings["order"] = requested
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
+
+    def update_label(self, name: str, new_name: str, color: str, style: str) -> str:
+        name = validate_label_name(name)
+        new_name = validate_label_name(new_name)
+        normalized_color = color.upper()
+        if not COLOR_RE.fullmatch(normalized_color):
+            raise StorageError("颜色必须为 #RRGGBB")
+        if style not in {"badge", "border"}:
+            raise StorageError("标签样式只能是角标或外框")
+        with self._lock():
+            old_path = self.label_dir / f"{name}.txt"
+            new_path = self.label_dir / f"{new_name}.txt"
+            if not old_path.exists():
+                raise StorageError("标签不存在")
+            if name != new_name and new_path.exists():
+                raise StorageError("新标签名已存在")
+            _, samples = self._read_label(old_path, repair=False)
+            settings = self._load_label_settings()
+            existing = [item.stem for item in self._label_paths()]
+            settings["order"] = [item for item in settings["order"] if item in existing]
+            settings["order"].extend(item for item in existing if item not in settings["order"])
+            if name != new_name:
+                os.replace(old_path, new_path)
+            self._write_label(new_path, normalized_color, samples)
+            settings["labels"].pop(name, None)
+            settings["labels"].setdefault(new_name, {})["style"] = style
+            settings["order"] = [new_name if item == name else item for item in settings["order"]]
+            if new_name not in settings["order"]:
+                settings["order"].append(new_name)
+            _atomic_write(self.settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n")
+        self.refresh_index(force=True)
+        return new_name
 
     def set_label_color(self, name: str, color: str) -> None:
         name = validate_label_name(name)

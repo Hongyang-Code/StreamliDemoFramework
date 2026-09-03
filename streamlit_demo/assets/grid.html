@@ -13,13 +13,16 @@
         <button type="button" data-role="close-viewer" class="icon-button" aria-label="关闭">×</button>
       </header>
       <div class="viewer-canvas" data-role="viewer-canvas">
+        <button type="button" data-role="viewer-previous" class="viewer-nav viewer-previous" aria-label="上一张图片">‹</button>
         <img data-role="viewer-image" alt="单独查看图片">
+        <button type="button" data-role="viewer-next" class="viewer-nav viewer-next" aria-label="下一张图片">›</button>
       </div>
       <footer>
+        <span class="viewer-position" data-role="viewer-position"></span>
         <button type="button" data-role="zoom-out" title="缩小" aria-label="缩小">−</button>
         <button type="button" data-role="zoom-reset">复位 · <span data-role="zoom-value">100%</span></button>
         <button type="button" data-role="zoom-in" title="放大" aria-label="放大">＋</button>
-        <small>滚轮缩放 · 拖拽平移</small>
+        <small>方向键切换 · 滚轮缩放 · 拖拽平移</small>
       </footer>
     </div>
   </dialog>

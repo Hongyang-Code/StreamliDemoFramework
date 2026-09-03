@@ -19,6 +19,13 @@ sample_grid_component = st.components.v2.component(
     js=_read("grid.js"),
 )
 
+label_manager_component = st.components.v2.component(
+    "label_manager",
+    html=_read("label_manager.html"),
+    css=_read("label_manager.css"),
+    js=_read("label_manager.js"),
+)
+
 
 def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
     return sample_grid_component(
@@ -32,5 +39,15 @@ def render_sample_grid(*, data: dict, rows: int, key: str = "sample_grid"):
         key=key,
         # The component measures its viewport-aware root instead of reserving a
         # fixed 700 px, so shorter displays do not acquire a page scrollbar.
+        height="content",
+    )
+
+
+def render_label_manager(*, data: dict, key: str = "label_manager"):
+    return label_manager_component(
+        data=data,
+        default={},
+        on_action_change=lambda: None,
+        key=key,
         height="content",
     )

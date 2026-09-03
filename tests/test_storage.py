@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from streamlit_demo.storage import CorruptNotesError, LabelStore, StorageError, stable_color
+from streamlit_demo.storage import (
+    LABEL_COLOR_PALETTE,
+    CorruptNotesError,
+    LabelStore,
+    StorageError,
+    next_palette_color,
+    stable_color,
+)
 
 
 def make_store(tmp_path: Path) -> LabelStore:
@@ -113,3 +120,45 @@ def test_per_label_style_survives_rename_and_is_removed_on_delete(tmp_path: Path
     assert store.get_label_styles() == {"renamed": "border"}
     store.delete_label("renamed")
     assert store.get_label_styles() == {}
+
+
+def test_label_order_is_persistent_and_survives_rename_and_delete(tmp_path: Path):
+    store = make_store(tmp_path)
+    store.create_label("first", "#112233")
+    store.create_label("second", "#223344")
+    store.create_label("third", "#334455")
+    store.set_label_order(["third", "first", "second"])
+    assert list(store.list_labels()) == ["third", "first", "second"]
+
+    store.rename_label("first", "renamed")
+    assert list(store.list_labels()) == ["third", "renamed", "second"]
+    store.delete_label("third")
+    assert list(store.list_labels()) == ["renamed", "second"]
+    assert json.loads((tmp_path / "label" / "label_settings.json").read_text())["order"] == [
+        "renamed",
+        "second",
+    ]
+
+
+def test_new_label_is_appended_after_legacy_labels_without_saved_order(tmp_path: Path):
+    label_dir = tmp_path / "label"
+    label_dir.mkdir()
+    (label_dir / "alpha.txt").write_text("#112233\n", encoding="utf-8")
+    (label_dir / "beta.txt").write_text("#223344\n", encoding="utf-8")
+    store = LabelStore(label_dir, set())
+    store.create_label("new", "#334455")
+    assert list(store.list_labels()) == ["alpha", "beta", "new"]
+
+
+def test_palette_uses_distinct_free_colors_and_recycles_deleted_color(tmp_path: Path):
+    store = make_store(tmp_path)
+    first = next_palette_color(store.list_labels().values())
+    store.create_label("first", first)
+    second = next_palette_color(store.list_labels().values())
+    store.create_label("second", second)
+    assert first == LABEL_COLOR_PALETTE[0]
+    assert second == LABEL_COLOR_PALETTE[1]
+    assert first != second
+
+    store.delete_label("first")
+    assert next_palette_color(store.list_labels().values()) == first
